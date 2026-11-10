@@ -69,7 +69,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 MB = 1_000_000
-SCRIPT_VERSION = "0.1.3"
+SCRIPT_VERSION = "0.1.4"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 
@@ -111,6 +111,13 @@ PROFILES = {
         "target_docs": None,
         "target_bytes": 100 * MB,
         "out": "sample",
+    },
+    "full2x": {
+        "cap": 400 * MB,
+        "n_files": {"en": 3, "id": 4},
+        "target_docs": None,
+        "target_bytes": 200 * MB,
+        "out": "sample_2x",
     },
 }
 
@@ -699,7 +706,7 @@ def main(argv=None, source_factory=None) -> int:
     trial_manifest = DATA_DIR / PROFILES["trial"]["out"] / "MANIFEST.json"
     trial_manifest_sha = None
     if args.run:  # every refusal below happens BEFORE any network access
-        if args.profile == "full":
+        if args.profile != "trial":
             try:
                 trial_manifest_sha = check_trial_manifest(trial_manifest)
             except PlanError as exc:
