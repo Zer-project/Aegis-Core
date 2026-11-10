@@ -87,6 +87,10 @@ def test_gerbang_full_tanpa_manifest_sebelum_jaringan(env):
     assert sc.main(["--profile", "full", "--run"], source_factory=boom) == 2
 
 
+def test_gerbang_full2x_tanpa_manifest_sebelum_jaringan(env):
+    assert sc.main(["--profile", "full2x", "--run"], source_factory=boom) == 2
+
+
 def _m_profile(m): m["profile"] = "full"
 def _m_rev(m): m["languages"]["en"]["revision"] = "x"
 def _m_lang(m): del m["languages"]["id"]
@@ -121,6 +125,14 @@ def test_full_manifest_valid_lolos_gerbang_lalu_berhenti_tidak_layak(env):
     assert sc.main(["--profile", "full", "--run"], source_factory=env.factory) == 2
     assert env.srcs["en"].calls > before  # gerbang lolos, rencana berjalan
     assert not env.full.exists()  # tidak layak: tidak ada keluaran
+
+
+def test_full2x_manifest_valid_lolos_gerbang_lalu_berhenti_tidak_layak(env):
+    assert trial(env) == 0
+    before = env.srcs["en"].calls
+    assert sc.main(["--profile", "full2x", "--run"], source_factory=env.factory) == 2
+    assert env.srcs["en"].calls > before  # gerbang lolos, rencana berjalan
+    assert not (env.full.parent / "sample_2x").exists()  # tidak layak: tanpa keluaran
 
 
 def test_overwrite_dan_sisa_dicek_sebelum_jaringan(env):
