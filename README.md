@@ -16,6 +16,7 @@ This is a work in progress. The repository is public so people can follow the wo
 | Tokenizer | Implemented (byte-level BPE, 16,384 vocabulary); see `tokenizer/` |
 | Training loop and checkpoint workflow | Implemented (CPU, resumable); see `scripts/train.py` |
 | Evaluation | Perplexity evaluator on held-out data (`scripts/evaluate_lm.py`); no task benchmarks yet |
+| Experiments log | LR and dropout experiments, v3 vs v4; see [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) |
 | Trained model checkpoint | Not included |
 
 The default configuration has about 30 million parameters because its vocabulary size (50,304) is a placeholder. Training runs use a 16,384-token vocabulary (17,011,584 parameters). Models trained so far are small, CPU-trained and not fluent. No claim is made about language-model quality: loss values alone are not evidence of capability. Trained checkpoints are not included.

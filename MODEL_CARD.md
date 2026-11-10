@@ -1,4 +1,4 @@
-# Aegis-Nano (v3): experimental small language model
+# Aegis-Nano: experimental small language model (checkpoints v3 and v4)
 
 **Status: research artifact.** Small, CPU-trained, not fluent, and not evaluated
 on any task benchmark. Not suitable for any production or user-facing use.
@@ -8,7 +8,7 @@ Weights are **not published**; see "License".
 
 - Decoder-only, pre-LayerNorm Transformer; GELU MLP (4x); learned position
   embeddings; tied input/output embeddings.
-- 6 layers, 6 heads, embedding width 384, context 256 tokens, dropout 0.1,
+- 6 layers, 6 heads, embedding width 384, context 256 tokens, dropout 0.1 (v3) or 0.0 (v4),
   no bias terms.
 - Tokenizer: byte-level BPE (Hugging Face `tokenizers`), vocabulary 16,384,
   trained on the training split only. Tokenizer sha256 `a31e3dcf2c889f7b44ced454e560676767fcba0e871fc9bb9c4c3cb017cf4153`.
@@ -28,11 +28,16 @@ underlying page. Provenance, holdout rule, dedup and limitations: see
 
 Single run, CPU only, seed 1337. 22,800 steps, batch 8, block 256
 (46,694,400 tokens, about one epoch-equivalent; windows are sampled at random
-with replacement, so not a single full pass). AdamW (betas 0.9/0.95), weight
+with replacement, so not a single full pass; by calculation, roughly 63% of
+tokens are seen at least once). AdamW (betas 0.9/0.95), weight
 decay 0.1 on tensors with 2+ dimensions, learning rate 1e-3 to 1e-4 (cosine),
-warmup 400, gradient clip 1.0. The learning rate was not tuned.
-Checkpoint sha256 `5802ebe849b81ce31f1fb6fd623d1e25e199ebe323ca97d8444fcde760de3647`.
+warmup 400, gradient clip 1.0. The learning rate was not tuned beyond a short-run comparison of 3e-4 and 1e-3
+(see docs/EXPERIMENTS.md).
+v3 checkpoint sha256 `5802ebe849b81ce31f1fb6fd623d1e25e199ebe323ca97d8444fcde760de3647`.
 Environment: Python 3.14.4, torch 2.14.1+cpu.
+v4 repeats v3 with `--dropout 0.0` and nothing else changed (about 17 h 43 min
+on CPU). v4 checkpoint sha256
+`ceec71d961dbd7c97bd55c34ab4c5156b52a21607329676a20d6379132a02522`.
 
 ## Evaluation
 
@@ -46,9 +51,12 @@ confidence intervals.
 | v1 | 2,000 | 6.361 | 6.376 |
 | v2 | 10,000 | 5.380 | 5.367 |
 | v3 | 22,800 | 4.788 | 4.759 |
+| v4 | 22,800 | 4.665 | not measured |
 
 v3 on the independent set: perplexity 120.1 (English loss 4.740, perplexity
-114.4; Indonesian loss 4.857, perplexity 128.6). The independent set was
+114.4; Indonesian loss 4.857, perplexity 128.6).
+v4 on the independent set: perplexity 106.2 (English loss 4.622,
+Indonesian loss 4.726). The independent set was
 evaluated with window stride 4 (1,893,120 of 7,571,884 tokens). English
 independence is at source-file level only; near-duplicates were not checked.
 The earlier holdout shares source files with the training data.
@@ -64,6 +72,8 @@ been run.
 - Training data is web text that may contain personal information,
   copyrighted material and bias. Memorization of such data was not tested.
 - No instruction tuning, safety tuning or output filtering.
+- v4 has lower loss than v3, but a generation check showed no measurable
+  reduction in repetition and no coherence gain (see docs/EXPERIMENTS.md).
 - Provenance note: the `catatan` field in the token metadata files says
   "trial data, not final". It is stale; the shards contain the full sample
   described above. The files are left unchanged because their hashes are
