@@ -82,6 +82,52 @@ Reading samples: v4 text is locally more fluent but still not coherent.
 Greedy decoding loops in both models, and the penalty reduces repetition at the
 cost of malformed tokens.
 
+## B1: 2x corpus, same compute (22,800 steps)
+
+Same recipe as v4 (dropout 0, LR 1e-3, warmup 400, seed 1337, 22,800 steps),
+trained on `data/tokens_2x`: 93,324,995 tokens (en 49,464,996, id 43,859,999),
+about 2.0x the v4 corpus, from the same source files with more row groups. One
+training document that was byte-identical to an independent-eval document was
+removed before tokenization with `scripts/dedup_against_eval.py` (en: 42,095 ->
+42,094 docs). Exact-text overlap with the independent eval was 0 for id.
+Near-duplicates were not checked.
+
+Independent eval, stride 4, same 1,893,120 tokens:
+
+| | v4 | B1 | Diff |
+|---|---|---|---|
+| en | 4.6220 | 4.6075 | -0.0145 |
+| id | 4.7263 | 4.7093 | -0.0170 |
+| all | 4.6653 | 4.6497 | -0.0156 |
+
+The pre-set criterion (more than 0.02 nat lower than v4) was **not met**.
+Checkpoint sha256: `2716ec521c7f5efc1d5db2e2cd395abc5605fecd16e4f4dacc0fb0a7eba33d14`.
+
+The run was interrupted and resumed with `--resume` from step 11,000. In the
+log, 37 steps were written twice; 34 are identical and the largest difference
+is 4.8e-7. No uninterrupted run exists, so bit-identical final weights are not
+shown. The `eval_loss` in the training log uses the `tokens_2x` holdout and is
+not comparable with v4.
+
+Generation check (same settings as v3/v4), rep4 en / id:
+
+| Strategy | B1 | v4 |
+|---|---|---|
+| greedy | 1.00 / 1.00 | 1.00 / 1.00 |
+| top-k 40 | 0.80 / 0.80 | 0.87 / 0.87 |
+| top-k 40, repetition penalty 1.2 | 0.27 / 0.20 | 0.60 / 0.20 |
+| top-p 0.9 | 0.80 / 0.87 | 0.87 / 0.87 |
+| top-p 0.9, repetition penalty 1.2 | 0.27 / 0.00 | 0.40 / 0.07 |
+
+Greedy decoding still loops in 100% of generations. About 15 generations per
+cell; differences are within noise. B1 text was not read, and rep4 does not
+measure coherence.
+
+Limits: one seed. The compute budget is fixed, so B1 sees about 0.5 epoch of
+its corpus; it does not test longer training on more data. Source files are the
+same as the v4 corpus, so this does not test data diversity in general. No
+claim about language ability is made.
+
 ## What these results do not show
 
 - Lower loss did not produce measurably less repetition or coherent text.
@@ -102,4 +148,27 @@ python scripts/train.py --data-dir data/tokens_full --out-dir data/runs_v4 \
   --eval-interval 2000 --eval-batches 8
 python scripts/evaluate_lm.py --ckpt v4=data/runs_v4/ckpt.pt \
   --eval-set indep=data/tokens_eval_indep:4 --out data/eval_results/results_v4_s4.json
+```
+
+## Reproduce B1
+
+```bash
+python scripts/sample_corpus.py --profile full2x --run
+python scripts/dedup_against_eval.py \
+  --train-files data/sample_2x/en_train.jsonl data/sample_2x/id_train.jsonl \
+  --eval-files data/eval_indep/en_eval.jsonl data/eval_indep/id_eval.jsonl \
+  --out-dir data/sample_2x_dd
+python scripts/prepare_tokens.py --split train \
+  --files data/sample_2x_dd/en_train.jsonl data/sample_2x_dd/id_train.jsonl \
+  --tokenizer-dir data/tokenizer_cmp/v16384 --out-dir data/tokens_2x
+python scripts/prepare_tokens.py --split eval \
+  --files data/sample_2x/en_eval.jsonl data/sample_2x/id_eval.jsonl \
+  --tokenizer-dir data/tokenizer_cmp/v16384 --out-dir data/tokens_2x
+python scripts/train.py --data-dir data/tokens_2x --out-dir data/runs_b1 \
+  --seed 1337 --batch-size 8 --block-size 256 --n-layer 6 --n-head 6 --n-embd 384 \
+  --dropout 0.0 --max-steps 22800 --lr 1e-3 --min-lr 1e-4 --warmup 400 \
+  --weight-decay 0.1 --grad-clip 1.0 --log-interval 10 --ckpt-interval 500 \
+  --eval-interval 2000 --eval-batches 8
+python scripts/evaluate_lm.py --ckpt b1=data/runs_b1/ckpt.pt \
+  --eval-set indep=data/tokens_eval_indep:4 --out data/eval_results/results_b1_s4.json
 ```
