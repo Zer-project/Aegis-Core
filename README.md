@@ -12,6 +12,7 @@ This is a work in progress. The repository is public so people can follow the wo
 | --- | --- |
 | Aegis-Nano model implementation | Present |
 | Model unit tests | Present; 25 tests passed in the reported local run |
+| Full test suite | 153 passed in a local run on 2026-11-14 (`python -m pytest -q`) |
 | Data-sampling script | Experimental; see [DATA.md](DATA.md) |
 | Tokenizer | Implemented (byte-level BPE, 16,384 vocabulary); see `tokenizer/` |
 | Training loop and checkpoint workflow | Implemented (CPU, resumable); see `scripts/train.py` |

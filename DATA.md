@@ -52,7 +52,7 @@ Server-side file sizes (metadata, not downloaded): `sample/10BT` has 14 files
 
 ## Sampling method
 
-The sample is built by `scripts/sample_corpus.py` (version 0.1.3 as of 2026-11-03;
+The sample is built by `scripts/sample_corpus.py` (version 0.1.4 as of 2026-11-14;
 the trial run used 0.1.1). It plans first and downloads only when run with `--run`.
 
 - Plan mode reads only parquet footers (metadata) and prints the worst-case
@@ -112,6 +112,29 @@ checked. The holdout documents come from the same source files as the training
 documents, so that separation is at document level only. The traffic cap was
 400 MB per language (effective 360 MB); counted requests were about 70 MB (en)
 and 93 MB (id).
+
+## Full sample 2x (2026-11-11)
+
+Built by `scripts/sample_corpus.py` v0.1.4 with `--profile full2x` on the same
+pinned revisions and the same source files as the full sample (en `002`, `007`,
+`011`; id `000`-`003`, `_00004`), with more row groups. Output is
+`data/sample_2x/` (not tracked by git; see `MANIFEST.json` there).
+
+Training documents byte-identical to an independent-eval document were removed
+with `scripts/dedup_against_eval.py` (exact text match only): 1 en document, 0 id
+documents. The result is `data/sample_2x_dd/`, which was tokenized with the same
+tokenizer (sha256 `a31e3dcf2c889f7b44ced454e560676767fcba0e871fc9bb9c4c3cb017cf4153`)
+into `data/tokens_2x`.
+
+| Language | Train docs | Train bytes | Train tokens | Holdout docs | Holdout tokens |
+|---|---|---|---|---|---|
+| en | 42,094 | 203,905,805 | 49,464,996 | 392 | 448,522 |
+| id | 53,894 | 204,777,386 | 43,859,999 | 561 | 450,286 |
+
+Near-duplicates were not checked. As before, holdout documents come from the same
+source files as the training documents. This corpus has not been filtered for
+spam or advertising; a quick keyword count suggested a large share of the id text
+is online-gambling spam, which has not been verified by reading documents.
 
 ## Independent evaluation
 
