@@ -154,6 +154,34 @@ this evidence the B1 gain is probably not seed noise, but two seeds are not a
 statistical estimate, B1 has one seed, and the pre-set 0.02 criterion is still
 not met. Per-language differences between seeds (about 0.007) have opposite signs.
 
+## Qualitative generation check: v4 vs B1
+
+One prompt per language, seed 1337, strategies greedy, top-k 40, and top-p 0.9
+with repetition penalty 1.2, first 300 characters of each sample. The prompt
+texts are not stored in the result files (`meta` lists only `en` and `id`). The
+samples were read by the AI assistant, not by an independent human rater.
+
+- Greedy loops in both models. en: sentence-level loops ("The city is ... of
+  the city"). id: v4 collapses into lines of "-", B1 repeats one sentence.
+- Top-k 40 repeats phrases within about 100 tokens in both models.
+- The repetition penalty removes the loops but produces malformed tokens and
+  invented names in both models.
+- Short phrases are locally grammatical, but there is no coherence across
+  sentences in either model.
+
+Extra statistics over all greedy generations (n = 5 per cell):
+
+| | v4 en | B1 en | v4 id | B1 id |
+|---|---|---|---|---|
+| Mostly punctuation | 0 | 0 | 1 | 1 |
+| Mean position of first repeated 4-gram | 12.0 | 8.6 | 11.4 | 14.0 |
+
+The differences point in opposite directions between languages and the cells
+are tiny, so there is no signal. No evidence was found that B1 improves
+generation over v4. The hypothesis that scale (17M parameters, 46-93M tokens)
+is the main limit has not been tested. Spam or advertising drift in id output
+was not checked systematically.
+
 ## What these results do not show
 
 - Lower loss did not produce measurably less repetition or coherent text.
