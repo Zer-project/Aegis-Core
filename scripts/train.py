@@ -1,4 +1,4 @@
-"""Training loop Aegis-Core (v0.1.0, prototipe untuk uji mekanika; CPU saja).
+"""Training loop Aegis-Core (v0.2.0, prototipe; default CPU, opsional CUDA + fp16).
 
 - Batch dari data_loader.get_batch(seed, step): deterministik terhadap nomor langkah.
 - Checkpoint atomik; resume menolak hash tokenizer/data, config, seed, atau jadwal LR berbeda.
@@ -7,11 +7,14 @@
 - Tidak mencetak atau menyimpan teks dokumen.
 """
 import argparse
+import contextlib
 import hashlib
 import json
 import math
 import os
+import shutil
 import sys
+import time
 from dataclasses import asdict
 from pathlib import Path
 
@@ -23,7 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import data_loader as dl  # noqa: E402
 from model import AegisConfig, AegisNano  # noqa: E402
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 CKPT, LOG = "ckpt.pt", "log.jsonl"
 SCHED_KEYS = ("seed", "batch_size", "block_size", "max_steps", "lr", "min_lr",
               "warmup", "weight_decay", "grad_clip")
@@ -54,6 +57,15 @@ def parse_args(argv=None):
     ap.add_argument("--eval-batches", type=int, default=4)
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--overwrite", action="store_true")
+    ap.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    ap.add_argument("--amp", choices=["off", "fp16"], default="off",
+                    help="fp16 hanya untuk --device cuda (P100/T4 tidak punya bf16)")
+    ap.add_argument("--time-budget-hours", type=float, default=None,
+                    help="berhenti rapi (simpan checkpoint) setelah waktu ini sejak run "
+                         "dimulai; lanjutkan dengan --resume")
+    ap.add_argument("--copy-ckpt-to", default=None,
+                    help="salin ckpt.pt dan log.jsonl ke folder ini setelah tiap "
+                         "penyimpanan (best-effort)")
     return ap.parse_args(argv)
 
 
@@ -82,7 +94,25 @@ def save_ckpt(path, payload):
     os.replace(tmp, path)
 
 
-def evaluate(model, a, tok_sha):
+def amp_ctx(dev, use_amp):
+    if use_amp:
+        return torch.autocast(device_type=dev.type, dtype=torch.float16)
+    return contextlib.nullcontext()
+
+
+def mirror(out, dest):
+    try:
+        d = Path(dest)
+        d.mkdir(parents=True, exist_ok=True)
+        for name in (CKPT, LOG):
+            tmp = d / (name + ".tmp")
+            shutil.copyfile(out / name, tmp)
+            os.replace(tmp, d / name)
+    except OSError as e:
+        print(f"PERINGATAN: salinan ke {dest} gagal: {e}", file=sys.stderr)
+
+
+def evaluate(model, a, tok_sha, dev=torch.device("cpu"), use_amp=False):
     mp = Path(a.data_dir) / "meta_eval.json"
     if not mp.is_file():
         return None
@@ -96,7 +126,9 @@ def evaluate(model, a, tok_sha):
             for i in range(a.eval_batches):
                 x, y = dl.get_batch(a.data_dir, "eval", a.batch_size, a.block_size,
                                     seed=a.seed, step=i, expected_tokenizer_sha256=tok_sha)
-                _, loss = model(x, y)
+                x, y = x.to(dev), y.to(dev)
+                with amp_ctx(dev, use_amp):
+                    _, loss = model(x, y)
                 tot += loss.item()
         return tot / a.eval_batches
     finally:
@@ -108,6 +140,15 @@ def run(a):
         raise ValueError("parameter tidak valid")
     if a.resume and a.overwrite:
         raise ValueError("--resume dan --overwrite tidak boleh bersamaan")
+    if a.device == "cuda" and not torch.cuda.is_available():
+        raise ValueError("--device cuda diminta tetapi CUDA tidak tersedia")
+    if a.amp == "fp16" and a.device != "cuda":
+        raise ValueError("--amp fp16 hanya untuk --device cuda")
+    if a.time_budget_hours is not None and a.time_budget_hours <= 0:
+        raise ValueError("--time-budget-hours harus > 0")
+    t0 = time.monotonic()
+    dev = torch.device(a.device)
+    use_amp = a.amp == "fp16"
     out = Path(a.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     ck, lg = out / CKPT, out / LOG
@@ -129,16 +170,17 @@ def run(a):
     sched = {k: getattr(a, k) for k in SCHED_KEYS}
 
     torch.manual_seed(a.seed)
-    model = AegisNano(cfg)
+    model = AegisNano(cfg).to(dev)  # init di CPU (seed sama), lalu dipindah
     params = list(model.parameters())
     opt = torch.optim.AdamW(
         [{"params": [p for p in params if p.dim() >= 2], "weight_decay": a.weight_decay},
          {"params": [p for p in params if p.dim() < 2], "weight_decay": 0.0}],
         lr=a.lr, betas=(0.9, 0.95))
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     start = 0
     if a.resume:
-        c = torch.load(ck, weights_only=True)
+        c = torch.load(ck, map_location="cpu", weights_only=True)
         if c["tokenizer_sha256"] != tok_sha:
             raise ValueError("hash tokenizer di checkpoint tidak cocok dengan data")
         if c["data_meta_sha256"] != data_sha:
@@ -147,8 +189,14 @@ def run(a):
             raise ValueError("config model di checkpoint berbeda")
         if c["sched"] != sched:
             raise ValueError("seed/jadwal/ukuran batch di checkpoint berbeda")
+        if c.get("amp", "off") != a.amp:
+            raise ValueError("mode --amp di checkpoint berbeda")
         model.load_state_dict(c["model"])
         opt.load_state_dict(c["optimizer"])
+        if use_amp:
+            if c.get("scaler") is None:
+                raise ValueError("checkpoint tanpa status GradScaler")
+            scaler.load_state_dict(c["scaler"])
         torch.set_rng_state(c["torch_rng"])
         start = int(c["step"])
 
@@ -157,7 +205,8 @@ def run(a):
         raise ValueError(f"tidak ada langkah tersisa (mulai={start}, akhir={end})")
 
     model.train()
-    losses, eval_loss = [], None
+    losses, eval_loss, skipped, done, budget_hit = [], None, 0, start, False
+    deadline = None if a.time_budget_hours is None else t0 + a.time_budget_hours * 3600
     with open(lg, "a", encoding="utf-8") as fl:
         for step in range(start, end):
             lr = lr_at(step, a.lr, a.min_lr, a.warmup, a.max_steps)
@@ -165,23 +214,37 @@ def run(a):
                 g["lr"] = lr
             x, y = dl.get_batch(a.data_dir, "train", a.batch_size, a.block_size,
                                 seed=a.seed, step=step, expected_tokenizer_sha256=tok_sha)
+            x, y = x.to(dev), y.to(dev)
             opt.zero_grad(set_to_none=True)
-            _, loss = model(x, y)
+            with amp_ctx(dev, use_amp):
+                _, loss = model(x, y)
             if not torch.isfinite(loss):
                 raise FloatingPointError(f"loss tidak hingga pada langkah {step}")
-            loss.backward()
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), a.grad_clip)
-            if not torch.isfinite(gn):
-                raise FloatingPointError(f"grad-norm tidak hingga pada langkah {step}")
-            opt.step()
+            gn_ok = bool(torch.isfinite(gn))
+            if use_amp:
+                skipped = 0 if gn_ok else skipped + 1
+                if skipped >= 20:
+                    raise FloatingPointError(
+                        f"20 langkah berturut-turut dilewati scaler (langkah {step})")
+                scaler.step(opt)
+                scaler.update()
+            else:
+                if not gn_ok:
+                    raise FloatingPointError(f"grad-norm tidak hingga pada langkah {step}")
+                opt.step()
             losses.append(loss.item())
-            last = step + 1 == end
+            done = step + 1
+            budget_hit = deadline is not None and time.monotonic() >= deadline
+            last = done == end or budget_hit
             if (step + 1) % a.log_interval == 0 or last:
                 fl.write(json.dumps({"step": step, "loss": losses[-1], "lr": lr,
-                                     "grad_norm": float(gn)}) + "\n")
+                                     "grad_norm": float(gn) if gn_ok else None}) + "\n")
                 fl.flush()
             if (a.eval_interval > 0 and (step + 1) % a.eval_interval == 0) or last:
-                eval_loss = evaluate(model, a, tok_sha)
+                eval_loss = evaluate(model, a, tok_sha, dev, use_amp)
                 if eval_loss is not None:
                     fl.write(json.dumps({"step": step, "eval_loss": eval_loss}) + "\n")
                     fl.flush()
@@ -189,9 +252,16 @@ def run(a):
                 save_ckpt(ck, {"model": model.state_dict(), "optimizer": opt.state_dict(),
                                "step": step + 1, "model_cfg": asdict(cfg), "sched": sched,
                                "torch_rng": torch.get_rng_state(), "tokenizer_sha256": tok_sha,
-                               "data_meta_sha256": data_sha, "script_version": __version__})
-    return {"losses": losses, "start_step": start, "end_step": end,
-            "eval_loss": eval_loss, "vocab": vocab, "ckpt": str(ck)}
+                               "data_meta_sha256": data_sha, "script_version": __version__,
+                               "amp": a.amp,
+                               "scaler": scaler.state_dict() if use_amp else None})
+                if a.copy_ckpt_to:
+                    mirror(out, a.copy_ckpt_to)
+            if budget_hit:
+                break
+    return {"losses": losses, "start_step": start, "end_step": done,
+            "eval_loss": eval_loss, "vocab": vocab, "ckpt": str(ck),
+            "budget_stop": budget_hit and done < end}
 
 
 def main(argv=None):
@@ -205,6 +275,9 @@ def main(argv=None):
     first = sum(r["losses"][:n]) / n
     last = sum(r["losses"][-n:]) / n
     print(f"langkah {r['start_step']}..{r['end_step']} dari {a.max_steps}")
+    if r["budget_stop"]:
+        print(f"BERHENTI: anggaran waktu habis pada langkah {r['end_step']}; "
+              "lanjutkan dengan --resume (perintah yang sama).")
     print(f"loss rata-rata {n} langkah pertama={first:.4f} terakhir={last:.4f} "
           f"ln(V)={math.log(r['vocab']):.4f}")
     print("eval_loss:", "tidak tersedia" if r["eval_loss"] is None else f"{r['eval_loss']:.4f}")
