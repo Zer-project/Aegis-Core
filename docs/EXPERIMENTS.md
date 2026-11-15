@@ -128,12 +128,38 @@ its corpus; it does not test longer training on more data. Source files are the
 same as the v4 corpus, so this does not test data diversity in general. No
 claim about language ability is made.
 
+## v4 second seed (22,800 steps, seed 2024)
+
+Same recipe and data as v4 (`data/tokens_full`); only `--seed 2024` and
+`--out-dir data/runs_v4_s2024` differ. Independent eval, stride 4, same
+1,893,120 tokens:
+
+| | v4 seed 1337 | v4 seed 2024 | Diff | B1 (seed 1337) |
+|---|---|---|---|---|
+| en | 4.6220 | 4.6152 | -0.0068 | 4.6075 |
+| id | 4.7263 | 4.7332 | +0.0069 | 4.7093 |
+| all | 4.6653 | 4.6642 | -0.0011 | 4.6497 |
+
+Checkpoint sha256: `185799894e961869c28dfa831008efb6e2dd4f3ba17209f25f8fbaba327e3bef`.
+
+The run was interrupted and resumed with `--resume` from step 14,000. 30 steps
+were written twice in the log and all are identical. The cause of the
+interruption is unknown (B1 was also interrupted). The training-log `eval_loss`
+(8 batches) was 4.6788 here versus 4.6384 for seed 1337; it depends on the seed
+and is not used for comparison.
+
+Reading: the spread between the two v4 seeds on the total is 0.0011 nat, much
+smaller than the B1 difference (-0.0156 and -0.0145 against the two seeds). On
+this evidence the B1 gain is probably not seed noise, but two seeds are not a
+statistical estimate, B1 has one seed, and the pre-set 0.02 criterion is still
+not met. Per-language differences between seeds (about 0.007) have opposite signs.
+
 ## What these results do not show
 
 - Lower loss did not produce measurably less repetition or coherent text.
   No claim about language ability is made.
-- Findings come from one seed at 6,000 and 22,800 steps, and two seeds at
-  2,000 steps. Only the LR values 3e-4 and 1e-3, and dropout 0 and 0.1, were tried.
+- Findings come from one seed at 6,000 steps, two seeds at 2,000 steps, and
+  two seeds at 22,800 steps for v4 only (B1 has one). Only the LR values 3e-4 and 1e-3, and dropout 0 and 0.1, were tried.
 - The model sees about one epoch-equivalent of data. Dropout 0 was not tested
   with repeated data.
 - No task benchmark, factuality, safety or memorization evaluation has been run.
