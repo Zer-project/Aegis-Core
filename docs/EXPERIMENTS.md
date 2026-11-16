@@ -239,6 +239,23 @@ Share of generations that stopped on EOS (penalized strategies), v4 / Model B:
 | top-k 40, repetition penalty 1.2 | 0.33 / 0.20 | 0.53 / 0.40 |
 | top-p 0.9, repetition penalty 1.2 | 0.20 / 0.20 | 0.60 / 0.53 |
 
+Held-out language-model loss, same eval set for all three (data/tokens_eval_indep,
+1,893,120 tokens, block 256, window stride 4, identical eval-set hash; from
+data/eval_results/results_{v4,b1,bgpu}_s4.json):
+
+| model | params | step | loss | perplexity | loss en | loss id |
+|---|---|---|---|---|---|---|
+| v4 | 17.0M | 22800 | 4.665 | 106.2 | 4.622 | 4.726 |
+| B1 | 17.0M | 22800 | 4.650 | 104.6 | 4.607 | 4.709 |
+| Model B | 33.7M | 5700 | 3.968 | 52.9 | 3.959 | 3.980 |
+
+Model B's loss is about 0.70 nats lower than v4 (perplexity about halved), in
+both languages. The v4 vs B1 difference is 0.016, so the gap is much larger
+than the differences seen between the 17M runs. One run, one seed. Size,
+tokens seen and data changed together, so the cause is not isolated: v4 and B1
+saw about 46.7M tokens (22800 steps x batch 8 x block 256), and Model B's batch
+size, and therefore its tokens seen, is not recorded here.
+
 Findings:
 
 - Without the repetition penalty, Model B and v4 are about the same: greedy is
@@ -281,7 +298,8 @@ What this does not show:
   v4 are not recorded here, so size, steps and data are all different.
 - Variation beyond the fixed prompt set and the seeds used.
 
-Next: add prompts and seeds, and report held-out eval loss for Model B and v4.
+Next: record Model B's batch size and tokens seen, add a second seed for Model
+B, and add prompts and seeds to the generation check.
 
 ## What these results do not show
 
