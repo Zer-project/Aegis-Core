@@ -192,9 +192,12 @@ prompts (5 en, 5 id; identical prompt hash), seeds 1337+i for 3 seeds, and at
 most 128 new tokens. Each sampling cell has 15 generations (5 prompts x 3
 seeds, so not independent); each greedy cell has 5 (5 prompts, one seed).
 
-TODO before commit: Model B identity (parameters, training tokens, hardware).
-Not recorded here yet. Model B stopped at step 5700 against step 22800 for v4,
-so the two runs are not matched in training steps.
+Model B (identity as reported by the author, not read from the checkpoint):
+33,694,208 parameters (8 layers, 8 heads, 512 embedding dim), trained for 5700
+steps on a training set of about 93.4M tokens (tokens_2x), on Kaggle GPU (2x
+Tesla T4). v4 has about 17M parameters and was evaluated at step 22800, so the
+two runs differ in size and in steps; the training data and batch size of v4
+are not recorded here.
 
 Metrics: d2/d3/d4 are distinct-n ratios; rep4% is the share of generations
 containing a repeated 4-gram; firstrep is the mean token position of the first
@@ -249,9 +252,19 @@ Findings:
 - Early stopping does not explain the English gap: Model B stopped on EOS no
   more often than v4, so its generations were not shorter.
 - Under the penalty, distinct-n is about 0.99 or higher (d4 0.998 to 0.9995).
-  The v4 vs B1 check above found that the penalty produces malformed tokens and
-  invented names, so high distinct-n here cannot be read as coherence. This is
-  an inference; Model B samples have not been read.
+  That alone does not indicate coherence. The v4 vs B1 check above found that
+  the penalty produces malformed tokens and invented names.
+- Samples were read (7 generations, seed 1337: penalized top-k 40 and top-p 0.9
+  on en prompts 0 and 1, penalized id prompt 0 for both strategies, and one
+  unpenalized top-k 40 en). Without the penalty, the en sample collapses into a
+  loop ("Vell-Vell-Vell-..."). With the penalty there are no loops, and the
+  first sentence is usually fluent, but later text drifts between topics and
+  contains contradictory or invented content (for example "dates back to the
+  19th century" followed by "20,000 years after its destruction"; the names
+  "Arrangel Röscherberg" and "Power Floor Stewart, NSW"; Europe, Japan and
+  Rasulullah SAW in one id paragraph), and table or list fragments from the
+  training data ("|Developmentary||Starting with Buddhism|"). This is a small
+  hand-read sample, not a rating.
 - Greedy firstrep (12.2 en, 10.8 id) is close to the v4 greedy values reported
   above (12.0 en, 11.4 id), so greedy looping looks unchanged. firstrep 110.0
   at rep4 0.0667 (top-k 40 with penalty, en) rests on a single generation.
@@ -260,14 +273,15 @@ Findings:
 
 What this does not show:
 
-- Coherence or text quality of Model B. No samples have been read.
+- Coherence or text quality of Model B. rep4% dropped under the penalty, but
+  the samples read show no evidence that text quality improved.
 - That Model B improves on v4 without a repetition penalty.
-- That scale or training length is the cause: Model B's size and data are not
-  recorded here, and its step count differs from v4.
+- That scale or training length is the cause. Model B has about twice the
+  parameters of v4 but 5700 steps against 22800, and the data and batch size of
+  v4 are not recorded here, so size, steps and data are all different.
 - Variation beyond the fixed prompt set and the seeds used.
 
-Next: read Model B samples under the penalized strategies on the same prompts,
-add prompts and seeds, and report held-out eval loss for Model B and v4.
+Next: add prompts and seeds, and report held-out eval loss for Model B and v4.
 
 ## What these results do not show
 
