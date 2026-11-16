@@ -182,6 +182,93 @@ generation over v4. The hypothesis that scale (17M parameters, 46-93M tokens)
 is the main limit has not been tested. Spam or advertising drift in id output
 was not checked systematically.
 
+## Model B (GPU) generation evaluation: decoding strategies, en and id
+
+Status: preliminary. One run per model. Source files: data/gen_eval/gen_eval_bgpu.json
+(Model B, checkpoint ckpt_bgpu.pt, step 5700) and data/gen_eval/gen_eval_v4.json
+(v4, step 22800). Both were produced by scripts/eval_generation.py (version
+0.1.0) with the same tokenizer (data/tokenizer_cmp/v16384), the same 10 fixed
+prompts (5 en, 5 id; identical prompt hash), seeds 1337+i for 3 seeds, and at
+most 128 new tokens. Each sampling cell has 15 generations (5 prompts x 3
+seeds, so not independent); each greedy cell has 5 (5 prompts, one seed).
+
+TODO before commit: Model B identity (parameters, training tokens, hardware).
+Not recorded here yet. Model B stopped at step 5700 against step 22800 for v4,
+so the two runs are not matched in training steps.
+
+Metrics: d2/d3/d4 are distinct-n ratios; rep4% is the share of generations
+containing a repeated 4-gram; firstrep is the mean token position of the first
+repeated 4-gram, averaged only over the generations that repeat (so it is not
+comparable across cells with different rep4%); tokens is the mean generated
+length. Repetition is measured on token IDs.
+
+| strategy | lang | d2 | d3 | d4 | rep4% | firstrep | tokens |
+|---|---|---|---|---|---|---|---|
+| greedy | en | 0.0945 | 0.1 | 0.1056 | 1.0 | 12.2 | 128.0 |
+| greedy | id | 0.0913 | 0.1016 | 0.1104 | 1.0 | 10.8 | 128.0 |
+| greedy_rep1.2 | en | 0.6173 | 0.7032 | 0.7616 | 1.0 | 44.2 | 128.0 |
+| greedy_rep1.2 | id | 0.6126 | 0.6667 | 0.6992 | 1.0 | 30.6 | 128.0 |
+| t1.0_pure | en | 0.9499 | 0.9852 | 0.9957 | 0.3333 | 86.0 | 114.5333 |
+| t1.0_pure | id | 0.9608 | 0.9798 | 0.9864 | 0.4 | 83.1667 | 123.4 |
+| t0.8_k40 | en | 0.646 | 0.7582 | 0.8152 | 0.9333 | 42.5 | 116.1333 |
+| t0.8_k40 | id | 0.7837 | 0.873 | 0.9189 | 0.8 | 58.75 | 120.2667 |
+| t0.8_k40_rep1.2 | en | 0.9648 | 0.9942 | 0.9995 | 0.0667 | 110.0 | 119.8 |
+| t0.8_k40_rep1.2 | id | 0.9674 | 0.9917 | 0.9978 | 0.1333 | 56.5 | 110.6667 |
+| t0.8_p0.9 | en | 0.6602 | 0.755 | 0.8082 | 0.9333 | 42.2143 | 122.0 |
+| t0.8_p0.9 | id | 0.7243 | 0.782 | 0.8064 | 0.8 | 54.5833 | 114.2667 |
+| t0.8_p0.9_rep1.2 | en | 0.978 | 0.9958 | 0.9984 | 0.0667 | 77.0 | 111.8667 |
+| t0.8_p0.9_rep1.2 | id | 0.9658 | 0.9871 | 0.9924 | 0.3333 | 89.2 | 107.4667 |
+
+Comparison with v4 (rep4%, same protocol, from the two result files):
+
+| Strategy | rep4 en (v4 / Model B) | rep4 id (v4 / Model B) |
+|---|---|---|
+| greedy | 1.00 / 1.00 | 1.00 / 1.00 |
+| top-k 40 | 0.87 / 0.93 | 0.87 / 0.80 |
+| top-k 40, repetition penalty 1.2 | 0.60 / 0.07 | 0.20 / 0.13 |
+| top-p 0.9 | 0.87 / 0.93 | 0.87 / 0.80 |
+| top-p 0.9, repetition penalty 1.2 | 0.40 / 0.07 | 0.07 / 0.33 |
+
+Share of generations that stopped on EOS (penalized strategies), v4 / Model B:
+
+| Strategy | en | id |
+|---|---|---|
+| top-k 40, repetition penalty 1.2 | 0.33 / 0.20 | 0.53 / 0.40 |
+| top-p 0.9, repetition penalty 1.2 | 0.20 / 0.20 | 0.60 / 0.53 |
+
+Findings:
+
+- Without the repetition penalty, Model B and v4 are about the same: greedy is
+  1.00 for both, and top-k 40 and top-p 0.9 differ by one generation of 15.
+- With the penalty, English rep4 is lower for Model B in both strategies
+  (0.60 to 0.07 and 0.40 to 0.07, i.e. 9 to 1 and 6 to 1 generations of 15).
+  Indonesian is mixed: 0.20 to 0.13 under top-k 40, but 0.07 to 0.33 under
+  top-p 0.9 (1 to 5 of 15).
+- The English gap is the only large difference. Generations share 5 prompts, so
+  the effective sample is smaller than 15 and significance is not established.
+- Early stopping does not explain the English gap: Model B stopped on EOS no
+  more often than v4, so its generations were not shorter.
+- Under the penalty, distinct-n is about 0.99 or higher (d4 0.998 to 0.9995).
+  The v4 vs B1 check above found that the penalty produces malformed tokens and
+  invented names, so high distinct-n here cannot be read as coherence. This is
+  an inference; Model B samples have not been read.
+- Greedy firstrep (12.2 en, 10.8 id) is close to the v4 greedy values reported
+  above (12.0 en, 11.4 id), so greedy looping looks unchanged. firstrep 110.0
+  at rep4 0.0667 (top-k 40 with penalty, en) rests on a single generation.
+- Pure sampling (t1.0_pure) gives rep4 0.33 en and 0.40 id with d4 about 0.99.
+  It has no v4 counterpart in the comparison above.
+
+What this does not show:
+
+- Coherence or text quality of Model B. No samples have been read.
+- That Model B improves on v4 without a repetition penalty.
+- That scale or training length is the cause: Model B's size and data are not
+  recorded here, and its step count differs from v4.
+- Variation beyond the fixed prompt set and the seeds used.
+
+Next: read Model B samples under the penalized strategies on the same prompts,
+add prompts and seeds, and report held-out eval loss for Model B and v4.
+
 ## What these results do not show
 
 - Lower loss did not produce measurably less repetition or coherent text.
