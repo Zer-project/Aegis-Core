@@ -184,3 +184,29 @@ def test_reservasi_sebelum_permintaan():
     with pytest.raises(sc.BudgetExceeded):
         sc.fetch_range(s, "p", 0, 101, m)
     assert s.calls == 0 and m.used == 0
+
+
+def test_gerbang_full9x_tanpa_manifest_sebelum_jaringan(env):
+    assert sc.main(["--profile", "full9x", "--run"], source_factory=boom) == 2
+
+
+def test_full9x_manifest_valid_lolos_gerbang_lalu_berhenti_tidak_layak(env):
+    assert trial(env) == 0
+    before = env.srcs["en"].calls
+    assert sc.main(["--profile", "full9x", "--run"], source_factory=env.factory) == 2
+    assert env.srcs["en"].calls > before  # gerbang lolos, rencana berjalan
+    assert not (env.full.parent / "sample_9x").exists()  # tidak layak: tanpa keluaran
+
+
+def test_profil_full9x_konfigurasi_terkunci():
+    p, p2 = sc.PROFILES["full9x"], sc.PROFILES["full2x"]
+    assert p["n_files"] == p2["n_files"]  # berkas sumber sama; independensi eval bergantung pada ini
+    assert p["cap"] == 900 * sc.MB and p["target_bytes"] == 900 * sc.MB
+    assert p["out"] == "sample_9x" and p["target_docs"] is None
+
+
+def test_pilihan_berkas_en_tidak_memuat_berkas_eval():
+    # eval independen memakai berkas en indeks 3 dan 10 (003, 010) dari 14 berkas
+    chosen = sc.choose_files(list(range(14)), 3)
+    assert chosen == [2, 7, 11]
+    assert not {3, 10} & set(chosen)

@@ -112,6 +112,13 @@ PROFILES = {
         "target_bytes": 100 * MB,
         "out": "sample",
     },
+    "full9x": {
+        "cap": 900 * MB,
+        "n_files": {"en": 3, "id": 4},
+        "target_docs": None,
+        "target_bytes": 900 * MB,
+        "out": "sample_9x",
+    },
     "full2x": {
         "cap": 400 * MB,
         "n_files": {"en": 3, "id": 4},
