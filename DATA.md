@@ -133,8 +133,77 @@ into `data/tokens_2x`.
 
 Near-duplicates were not checked. As before, holdout documents come from the same
 source files as the training documents. This corpus has not been filtered for
-spam or advertising; a quick keyword count suggested a large share of the id text
-is online-gambling spam, which has not been verified by reading documents.
+spam or advertising. A keyword count (not verified by reading documents) found
+that about 9% of its id documents (4,754 of 53,894) contain online-gambling terms
+(slot, judi, togel, gacor, maxwin) at a density above 0.5%, and about 27% trip a
+broader commercial-keyword rule. The broader rule also matches ordinary words
+(harga, situs, daftar), so it is not an estimate of spam.
+
+## Full sample 9x (2026-11-16)
+
+Built by `scripts/sample_corpus.py` with `--profile full9x` on the same pinned
+revisions and the same source files as the full sample (en `002`, `007`, `011`;
+id `000`-`003`, `_00004`), with more row groups. The manifest
+(`data/sample_9x/MANIFEST.json`, created 2026-11-16T16:41:33Z, not tracked by git)
+records the script sha256
+`3ce9292e64c090aa7b8dad669522d2b5be0fcd0b63f2c674b8f09b5873ecf1aa` and the
+version label 0.1.4; the label was not bumped when the `full9x` profile was added.
+The traffic cap was 900 MB per language (effective 810 MB); counted requests were
+about 558 MB (en) and 408 MB (id).
+
+| Language | Train docs | Train text bytes | Holdout docs | Duplicates skipped by the sampler |
+|---|---|---|---|---|
+| en | 188,393 | 900,001,317 | 1,796 | 149 |
+| id | 242,586 | 900,004,805 | 2,382 | 0 |
+
+Raw output hashes (sha256): `en_train.jsonl` `8e10d492d37e2ca62de9c50c260f18672cb55888501277057049d708f92301d0`,
+`id_train.jsonl` `4cd74052a5ad3609c0f124217c751f25ae9219cf5c31f5053d8012ccf53c4ee3`.
+
+### Filter F1 (training split only)
+
+`scripts/clean_f1.py` (sha256 starts with `8a9b502237eb`) writes
+`data/sample_9x_clean/`. A document is dropped if it has fewer than 50 words or
+contains any of the terms slot, judi, togel, gacor, maxwin, "situs slot" or
+"bandar togel" (case-insensitive, whole words). One matching word is enough; there
+is no density threshold. Bad JSON lines would be skipped without being counted,
+but the counts below add up to the input counts, so none were skipped.
+
+| Language | Dropped: short only | Dropped: core term | Total dropped | Kept |
+|---|---|---|---|---|
+| en | 57 | 406 | 463 (0.25%) | 187,930 |
+| id | 72 | 27,898 | 27,970 (11.5%) | 214,616 |
+
+The word "slot" can be legitimate in English (for example "time slot"); how many of
+the 406 en documents are not gambling was not checked. Hashes of the kept files:
+`en_train.jsonl` `e7c50107322a6fbec1e8f6e0176ea7082a8e2fbaa9734d90172bfb9b6c0a4f8a`,
+`id_train.jsonl` `98b73d353974f9ecb657f334163fa55312b2a90e773196454ef669d2d2cde829`.
+The holdout and the independent evaluation set were not filtered
+(`sample_9x_clean` holds only train files).
+
+### Tokens
+
+Tokenized with the same tokenizer (sha256
+`a31e3dcf2c889f7b44ced454e560676767fcba0e871fc9bb9c4c3cb017cf4153`) into
+`data/tokens_9x_clean`: en 221,440,917 tokens, id 167,001,503 tokens, total
+388,442,420; no document was skipped. `meta_train.json` sha256:
+`2f84aca435dfc7a12ffb90c4ca903a8558e2d2cc2d135415e7b96b74035aa5ee`.
+
+### Separation from the independent evaluation set
+
+- Source files: no overlap. The independent evaluation set uses en `003` and `010`
+  and the official id test split.
+- Exact text (sha256 of the text), filtered train against the independent
+  evaluation set: 6 en documents and 0 id documents are identical. These 6 were
+  not removed, and the model trained on them. Their effect on the loss is expected
+  to be small but was not measured.
+- Exact text, filtered train against this corpus's own holdout: 0.
+- The earlier full sample (30 Oct, `data/sample`) has 0 exact-text matches with the
+  independent evaluation set in both languages.
+- Near-duplicates were not checked.
+- The independent evaluation set was not filtered: 455 of its 3,821 id documents
+  and 9 of its 3,999 en documents contain one of the core terms. A model trained
+  on filtered data is therefore evaluated on some documents of a kind it never
+  saw.
 
 ## Independent evaluation
 
