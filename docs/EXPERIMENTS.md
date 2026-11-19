@@ -192,12 +192,14 @@ prompts (5 en, 5 id; identical prompt hash), seeds 1337+i for 3 seeds, and at
 most 128 new tokens. Each sampling cell has 15 generations (5 prompts x 3
 seeds, so not independent); each greedy cell has 5 (5 prompts, one seed).
 
-Model B (identity as reported by the author, not read from the checkpoint):
+Model B (identity as reported by the author; the layer, head and embedding
+sizes, steps, batch size and LR schedule were later read from the checkpoint):
 33,694,208 parameters (8 layers, 8 heads, 512 embedding dim), trained for 5700
 steps on a training set of about 93.4M tokens (tokens_2x), on Kaggle GPU (2x
 Tesla T4). v4 has about 17M parameters and was evaluated at step 22800, so the
-two runs differ in size and in steps; the training data and batch size of v4
-are not recorded here.
+two runs differ in size and in steps; the data and batch size differ as well
+(v4: tokens_full, batch 8; Model B: tokens_2x, batch 64, read from the
+checkpoint).
 
 Metrics: d2/d3/d4 are distinct-n ratios; rep4% is the share of generations
 containing a repeated 4-gram; firstrep is the mean token position of the first
@@ -253,8 +255,8 @@ Model B's loss is about 0.70 nats lower than v4 (perplexity about halved), in
 both languages. The v4 vs B1 difference is 0.016, so the gap is much larger
 than the differences seen between the 17M runs. One run, one seed. Size,
 tokens seen and data changed together, so the cause is not isolated: v4 and B1
-saw about 46.7M tokens (22800 steps x batch 8 x block 256), and Model B's batch
-size, and therefore its tokens seen, is not recorded here.
+saw about 46.7M tokens (22800 steps x batch 8 x block 256), and Model B saw
+about 93.4M tokens (5700 steps x batch 64 x block 256).
 
 Findings:
 
@@ -294,12 +296,14 @@ What this does not show:
   the samples read show no evidence that text quality improved.
 - That Model B improves on v4 without a repetition penalty.
 - That scale or training length is the cause. Model B has about twice the
-  parameters of v4 but 5700 steps against 22800, and the data and batch size of
-  v4 are not recorded here, so size, steps and data are all different.
+  parameters of v4 but 5700 steps against 22800, and batch 64 against 8
+  (about 93.4M tokens seen against 46.7M), on different data, so size, steps,
+  batch and data are all different.
 - Variation beyond the fixed prompt set and the seeds used.
 
-Next: record Model B's batch size and tokens seen, add a second seed for Model
-B, and add prompts and seeds to the generation check.
+Next: add a second seed for Model B, and add prompts and seeds to the
+generation check. Model B's batch size and tokens seen were read from its
+checkpoint (see the 9x section below).
 
 ## What these results do not show
 
@@ -345,3 +349,126 @@ python scripts/train.py --data-dir data/tokens_2x --out-dir data/runs_b1 \
 python scripts/evaluate_lm.py --ckpt b1=data/runs_b1/ckpt.pt \
   --eval-set indep=data/tokens_eval_indep:4 --out data/eval_results/results_b1_s4.json
 ```
+
+## Model B learning-rate sweep (1,500 steps, GPU)
+
+Model B (8 layers, 8 heads, 512 embedding dim) on `tokens_2x`, batch 64, block
+256, 1,500 steps, warmup 100, seed 1337, dropout 0, fp16, minimum LR = LR / 10.
+Four LRs, two at a time on the two T4 GPUs (one run per GPU, selected with
+`CUDA_VISIBLE_DEVICES`). `eval_loss` is the loss on the `tokens_2x` holdout (32
+batches), so it is comparable only inside this sweep, not with the evaluation
+numbers elsewhere in this file.
+
+| Step | LR 3e-4 | LR 6e-4 | LR 1e-3 | LR 2e-3 |
+|---|---|---|---|---|
+| 249 | 6.4535 | 6.3039 | 6.2412 | 6.2826 |
+| 499 | 5.9788 | 5.7641 | 5.6540 | 5.7358 |
+| 749 | 5.6432 | 5.3936 | 5.2656 | 5.3946 |
+| 999 | 5.4385 | 5.1640 | 5.0135 | 5.1573 |
+| 1249 | 5.3216 | 5.0243 | 4.8419 | 4.9880 |
+| 1499 | 5.2594 | 4.9482 | 4.7448 | 4.8889 |
+
+Rule fixed before the results: pick the lowest final `eval_loss`; if two are
+within 0.02, pick the lower LR. LR 1e-3 had the lowest `eval_loss` at every
+evaluation from step 249 on, and was 0.144 below the next best (2e-3) at step
+1,499. It is not at the edge of the grid. No logged step (every 10th) had a
+non-finite gradient norm in any run.
+
+Limits: short runs tend to favour larger LRs; one seed; the grid spacing is about
+a factor of 2, so the optimum may lie anywhere between 6e-4 and 2e-3.
+
+The two waves took 448 s and 463 s for 1,500 steps x 16,384 tokens per run, i.e.
+at least about 54,900 and 53,100 tokens per second per T4. This is a lower bound,
+because the wall time includes startup and six evaluations.
+
+## GPU smoke test (Kaggle, 100 steps)
+
+`scripts/train.py` v0.2.0 (commit `9e76e3f`), torch 2.11.0+cu130, 2 x Tesla T4
+(15,360 MiB each; only one is used), the 17M configuration (6 layers, 6 heads, 384)
+on `tokens_full`, batch 64, block 256, fp16, notebook private. Data hashes and the
+tokenizer hash were checked inside the notebook.
+
+- 100 steps run as 0-50 (`--stop-after 50`) and 50-100 (`--resume`); the two
+  segments took 18.3 s and 15.1 s of wall time (startup included), i.e. at least
+  about 44,900 and 54,300 tokens per second.
+- Training loss fell from 9.13 (step 4) to 7.32 (step 99); `eval_loss` 7.49 at
+  step 49 and 7.28 at step 99. No logged step had a non-finite gradient norm.
+- The checkpoint had `amp` = fp16 and a non-empty scaler state; the scaler's
+  growth tracker was 100 at step 100 across the resume, which is consistent with
+  the scaler state having been restored.
+- `--time-budget-hours` stopped a run cleanly at step 36 and the resume completed
+  it to step 100.
+- The checkpoint was opened on CPU with `map_location="cpu"`.
+
+This tests the mechanics only; a loss of 7.3 after 100 steps says nothing about
+quality.
+
+## Model B on the 9x corpus (23,700 steps)
+
+Same model and settings as the Model B control (8 layers, 8 heads, 512 embedding
+dim, batch 64, block 256, LR 1e-3 to 1e-4, weight decay 0.1, clip 1.0, dropout 0,
+seed 1337, fp16) except as listed below. Trained on Kaggle with Save & Run All (one
+T4 used), data `data/tokens_9x_clean` (see `DATA.md`): 388,442,420 tokens
+(en 221,440,917, id 167,001,503).
+
+Checkpoint `data/ckpt_b9x.pt`, sha256
+`5ef282664c70fa6e971f250f78e0c970205350987a464740da50a590ad6c5c66`. Checked on
+the downloaded file: step 23700, `amp` fp16, script version 0.2.0, the data meta
+hash in the checkpoint equals the sha256 of `meta_train.json`
+(`2f84aca435dfc7a12ffb90c4ca903a8558e2d2cc2d135415e7b96b74035aa5ee`), the
+tokenizer hash equals `a31e3dcf2c889f7b44ced454e560676767fcba0e871fc9bb9c4c3cb017cf4153`,
+and the schedule in the checkpoint matches the command that was run. The hash in
+`results_b9x_s4.json` equals the hash above. There is no hash from the Kaggle side.
+
+Independent eval, stride 4, same 1,893,120 tokens as for the other models:
+
+| model | params | tokens seen | loss | perplexity | loss en | loss id |
+|---|---|---|---|---|---|---|
+| v4 | 17.0M | 46.7M | 4.665 | 106.2 | 4.622 | 4.726 |
+| B1 | 17.0M | 46.7M | 4.650 | 104.6 | 4.607 | 4.709 |
+| Model B, `tokens_2x` | 33.7M | 93.4M | 3.968 | 52.9 | 3.959 | 3.980 |
+| Model B, `tokens_9x_clean` | 33.7M | 388.3M | 3.663 | 39.0 | 3.595 | 3.758 |
+
+Model B 9x is 0.305 nat below the Model B control (en -0.364, id -0.222). The gap
+is about 15 times the 0.02 criterion used elsewhere in this file and has the same
+sign in both languages. The seed spread measured for the 17M model (0.001) is far
+smaller, but it was not measured for Model B, and this is one seed.
+
+What changed between the control and this run, all at once: tokens seen (93.4M to
+388.3M, about 4.2x) and therefore steps (5,700 to 23,700), warmup (200 to 500),
+the filter F1 (training split only), and the language mix (en 53% to 57% of
+tokens). In both runs the number of tokens seen is about one pass over the corpus
+by count; sampling with replacement covers only about 63% of the tokens
+(a calculation, not a measurement). So the result does not separate "more data"
+from "more training", and does not isolate the filter.
+
+The independent eval set was not filtered: 455 of its 3,821 id documents contain a
+core gambling term that the model never saw in training. The smaller id gain
+(-0.222 against -0.364 for en) may be related; this is a hypothesis, not tested.
+Six en training documents are byte-identical to independent-eval documents and
+were not removed (see `DATA.md`); their effect was not measured.
+
+A lower loss is not evidence of language ability. Not yet done for this model:
+generation evaluation and reading of samples, loss on the eval subset without core
+gambling terms, a second seed, and a memorization test.
+
+## Reproduce Model B on 9x
+
+```bash
+python scripts/sample_corpus.py --profile full9x --run
+python scripts/clean_f1.py      # writes data/sample_9x_clean (train split only)
+# tokenization (not recorded as a command): scripts/prepare_tokens.py with
+# --tokenizer-dir data/tokenizer_cmp/v16384 into data/tokens_9x_clean;
+# the inputs and their sha256 are in data/tokens_9x_clean/meta_train.json
+python scripts/train.py --data-dir data/tokens_9x_clean --out-dir data/run_model_b_9x \
+  --device cuda --amp fp16 --seed 1337 --batch-size 64 --block-size 256 \
+  --n-layer 8 --n-head 8 --n-embd 512 --dropout 0.0 --max-steps 23700 \
+  --lr 1e-3 --min-lr 1e-4 --warmup 500 --weight-decay 0.1 --grad-clip 1.0 \
+  --log-interval 50 --ckpt-interval 1000 --eval-interval 2000 --eval-batches 32 \
+  --time-budget-hours 5
+python scripts/evaluate_lm.py --ckpt b9x=data/ckpt_b9x.pt \
+  --eval-set indep=data/tokens_eval_indep:4 --out data/eval_results/results_b9x_s4.json
+```
+
+The training run used GPU hardware, so the weights are not expected to be
+bit-identical on a rerun.
