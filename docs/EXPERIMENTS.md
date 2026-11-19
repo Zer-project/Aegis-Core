@@ -158,8 +158,9 @@ not met. Per-language differences between seeds (about 0.007) have opposite sign
 
 One prompt per language, seed 1337, strategies greedy, top-k 40, and top-p 0.9
 with repetition penalty 1.2, first 300 characters of each sample. The prompt
-texts are not stored in the result files (`meta` lists only `en` and `id`). The
-samples were read by the AI assistant, not by an independent human rater.
+texts are stored in `meta["prompts"]` of the result files (here "The history of the
+city begins" and "Sejarah kota ini dimulai"). The samples were read by the AI
+assistant, not by an independent human rater.
 
 - Greedy loops in both models. en: sentence-level loops ("The city is ... of
   the city"). id: v4 collapses into lines of "-", B1 repeats one sentence.
@@ -448,9 +449,79 @@ core gambling term that the model never saw in training. The smaller id gain
 Six en training documents are byte-identical to independent-eval documents and
 were not removed (see `DATA.md`); their effect was not measured.
 
-A lower loss is not evidence of language ability. Not yet done for this model:
-generation evaluation and reading of samples, loss on the eval subset without core
-gambling terms, a second seed, and a memorization test.
+A lower loss is not evidence of language ability; see the generation check below.
+Not yet done for this model: loss on the eval subset without core gambling terms,
+a second seed, and a memorization test.
+
+## Model B 9x: generation check
+
+`scripts/eval_generation.py` (0.1.0) on `data/ckpt_b9x.pt` (step 23700, sha256
+`5ef282664c70fa6e971f250f78e0c970205350987a464740da50a590ad6c5c66`), same tokenizer,
+same 10 fixed prompts, 128 new tokens and 3 seeds as for v4, B1 and the Model B
+control. The prompt set has the same hash (`b093f42c6247`) in all four result files.
+It took 23 min 42 s on CPU. Command:
+`python scripts/eval_generation.py --ckpt data/ckpt_b9x.pt --tokenizer-dir data/tokenizer_cmp/v16384 --out data/gen_eval/gen_eval_b9x.json --max-new-tokens 128 --seeds 3`.
+
+rep4 (share of generations with a repeated 4-gram), en / id. Each sampling cell has
+15 generations from 5 prompts (not independent), each greedy cell has 5.
+
+| Strategy | v4 | Model B (tokens_2x) | Model B (9x) |
+|---|---|---|---|
+| greedy | 1.00 / 1.00 | 1.00 / 1.00 | 1.00 / 1.00 |
+| top-k 40 | 0.87 / 0.87 | 0.93 / 0.80 | 1.00 / 1.00 |
+| top-k 40, repetition penalty 1.2 | 0.60 / 0.20 | 0.07 / 0.13 | 0.47 / 0.33 |
+| top-p 0.9 | 0.87 / 0.87 | 0.93 / 0.80 | 0.80 / 0.87 |
+| top-p 0.9, repetition penalty 1.2 | 0.40 / 0.07 | 0.07 / 0.33 | 0.33 / 0.33 |
+
+Greedy decoding loops in every generation for all three models. For 9x the first
+repeated 4-gram comes later (mean token 28.2 en, 14.0 id, against 12.2 and 10.8 for
+the control) and the distinct-4 ratio is higher (en 0.28 against 0.11, id 0.16
+against 0.11), but the text still loops. The English drop under the penalty seen
+for the control (0.60 to 0.07) is not repeated for 9x (0.47), which supports
+reading that difference as noise. Differences of one or two generations out of 15
+are not a signal. rep4 does not measure coherence or truth.
+
+Samples read (prompt 0 of each language, seed 1337, greedy, top-k 40, and top-p 0.9
+with penalty; first 300 characters; 6 per model; the other generations were not
+read; read by the AI assistant, not by an independent rater):
+
+- Greedy loops in both models. For 9x the English text states a date ("late 18th
+  century", then "founded in 1812", which contradict each other) and then repeats
+  "the city of Havana" clauses; the control repeats "the city of the city".
+- Top-k 40 stays fluent for a sentence or two and then drifts: the English sample
+  moves from the history of the city to "an important source of information,
+  information and information for residents of the towns, towns and villages"; the
+  Indonesian sample moves from the history of a city to travel-guide style headings.
+- With the penalty there are no loops, but the text changes topic inside 300
+  characters and contains specific names and dates that nothing in the prompt
+  supports (for example "Hone (1856-1924)", "Brettin (1842)"). Whether any of them
+  is a real person or date was not checked.
+- In these 6 samples there is no "Vell-Vell-Vell" loop and no table or list
+  fragment, both of which appeared in the control samples. This is a sample of 6,
+  and list-like fragments do appear elsewhere in the 9x output: the Indonesian
+  greedy text for the probe prompt below is lines of "- Suhu kamar mandi".
+
+Factual probe (prompt 1, "Water boils at a temperature of" / "Air mendidih pada
+suhu"): count of generations whose first 80 characters contain "100" or "212"
+(plain string match, so "1000" would count). Sampling strategies (5 strategies x 3
+seeds = 15 generations per cell):
+
+| | v4 | B1 | Model B (tokens_2x) | Model B (9x) |
+|---|---|---|---|---|
+| en | 0 | 1 | 0 | 0 |
+| id | 0 | 0 | 0 | 0 |
+
+No greedy generation (1 per model and language) contains it either. The 9x English
+greedy text begins "about 1.5 degrees Celsius", fluent and wrong; the Indonesian
+greedy text repeats "Suhu kamar mandi". The single B1 match was not read. This is one
+prompt, not a benchmark; it only shows that a fluent continuation can be false.
+
+Against the question this run was meant to answer: a loss of 3.66 against 4.67
+(v4) did not reduce repetition as measured by rep4, did not remove looping under
+greedy decoding, and did not produce a correct answer to the one factual prompt
+checked. Local fluency of single sentences is somewhat better in the samples read.
+One seed, small samples, one non-independent rater. The hypothesis that scale (model
+size and training tokens) is the main limit is still untested.
 
 ## Reproduce Model B on 9x
 
