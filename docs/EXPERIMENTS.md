@@ -386,7 +386,7 @@ because the wall time includes startup and six evaluations.
 
 `scripts/train.py` v0.2.0 (commit `9e76e3f`), torch 2.11.0+cu130, 2 x Tesla T4
 (15,360 MiB each; only one is used), the 17M configuration (6 layers, 6 heads, 384)
-on `tokens_full`, batch 64, block 256, fp16, notebook private. Data hashes and the
+on `tokens_full`, batch 64, block 256, fp16, one of the two T4 GPUs used. Data hashes and the
 tokenizer hash were checked inside the notebook.
 
 - 100 steps run as 0-50 (`--stop-after 50`) and 50-100 (`--resume`); the two
@@ -419,7 +419,8 @@ hash in the checkpoint equals the sha256 of `meta_train.json`
 (`2f84aca435dfc7a12ffb90c4ca903a8558e2d2cc2d135415e7b96b74035aa5ee`), the
 tokenizer hash equals `a31e3dcf2c889f7b44ced454e560676767fcba0e871fc9bb9c4c3cb017cf4153`,
 and the schedule in the checkpoint matches the command that was run. The hash in
-`results_b9x_s4.json` equals the hash above. There is no hash from the Kaggle side.
+`results_b9x_s4.json` equals the hash above. There is no hash from the Kaggle
+side for this run (seed 1337).
 
 Independent eval, stride 4, same 1,893,120 tokens as for the other models:
 
@@ -445,17 +446,107 @@ from "more training", and does not isolate the filter.
 
 The independent eval set was not filtered: 455 of its 3,821 id documents contain a
 core gambling term that the model never saw in training. The smaller id gain
-(-0.222 against -0.364 for en) may be related; this is a hypothesis, not tested.
+(-0.222 against -0.364 for en) may be related; this was tested on an evaluation
+subset without those documents (see the next section).
 Six en training documents are byte-identical to independent-eval documents and
 were not removed (see `DATA.md`); their effect was not measured.
 
 A lower loss is not evidence of language ability; see the generation check below.
-Not yet done for this model: loss on the eval subset without core gambling terms,
-a second seed, and a memorization test.
+Not yet done for this model: a memorization test and a generation check for the
+second seed.
+
+## Model B on the 9x corpus: second seed and eval without core gambling terms
+
+Second seed: same code (commit `9e76e3f`), data (`tokens_9x_clean`) and
+hyperparameters as the first 9x run; only `--seed 2024` and the output folder
+differ. Trained on Kaggle on 2026-11-19 (Save & Run All, one of the two T4 GPUs used).
+Before training, the notebook checked the sha256 of both `meta_*.json` files and of
+every shard, and the training token total (388,442,420); no such check was
+recorded for the seed-1337 run. The log shows `langkah 0..23700`, so the run was not
+interrupted. Wall time was 129 min 10 s, i.e. at least about 50,100 tokens per second
+(a lower bound: it includes startup and 12 evaluations). The `eval_loss` in the
+training log (9x holdout, 32 batches) was 3.6281; it is not comparable with the
+other evaluations.
+
+Identity of the checkpoint. The `ckpt.pt` written by Kaggle has 404,399,973 bytes and
+sha256 `ac710d4df085ca8f970e978637888d0021858d6696e4a48481b0e79dd736a656`. It was
+downloaded as `ckpt.zip` (same hash) and is kept as `data/ckpt_b9x_s2024_kaggle.pt`.
+The file used for the evaluations below, `data/ckpt_b9x_s2024.pt`, is not
+byte-identical to it: 370,913,612 bytes, sha256
+`7c1d773d52984622d615b920df91a19f8105cbef60e0c091c6d14d785d70f457`. Its 52 model
+tensors are identical to the original bit for bit, and the keys, the step (23700) and
+the size of the optimizer state (51 parameters, 67,388,467 elements) are the same;
+the optimizer state values and `torch_rng` were not compared. Why it is 33,486,361
+bytes smaller is not known (it was probably re-saved by some process). Both result
+files record the hash of the re-saved file, and the `eval_loss` computed on it (CPU,
+fp32, the same 32 batches) is 3.6281, equal to the Kaggle value. For the seed-1337
+run (`data/ckpt_b9x.pt`, 404,383,352 bytes) there is no hash from the Kaggle side;
+its identity rests on the step, the data meta hash, the schedule and the hash in its
+result file, which all match.
+
+Independent eval, stride 4, 1,893,120 tokens (as in the table above):
+
+| model | loss | perplexity | loss en | loss id |
+|---|---|---|---|---|
+| Model B, `tokens_2x` (control) | 3.968 | 52.9 | 3.959 | 3.980 |
+| Model B 9x, seed 1337 | 3.663 | 39.0 | 3.595 | 3.758 |
+| Model B 9x, seed 2024 | 3.650 | 38.5 | 3.583 | 3.744 |
+| Model B 9x, mean of the two seeds | 3.656 | - | 3.589 | 3.751 |
+
+The two seeds differ by 0.013 (en 0.012, id 0.014), in the same direction in both
+languages. The rule fixed before the second seed was run: a difference below 0.05
+counts as stable, and results are reported as mean and range. Two seeds are not a
+statistical estimate, and the control has one seed. The two 17M v4 seeds differed by
+0.001, so the spread for Model B is larger. The gain over the control is -0.305 and
+-0.318 (mean -0.312).
+
+### Evaluation without core gambling terms
+
+`data/eval_indep_f1` holds the independent-eval documents that pass
+`scripts/clean_f1.py` (the rule used on the training data): en 3,990 of 3,999
+documents, id 3,366 of 3,821. File sha256: en
+`f1670405f5670c8562b3fc9eeeeb495a5759a326f9c38194b6a2167cd7046479`, id
+`e81f7fff30425675fd89d69d9a6be606363fd5362a89c2590cabe1030d77e30e`. They were
+tokenized with the same tokenizer into `data/tokens_eval_indep_f1` (4,361,611 en and
+2,684,106 id tokens in the files); stride-4 windows evaluate 1,090,560 en and 671,177
+id tokens, 1,761,737 in total. The control and the two seeds were evaluated with
+`--eval-set indepf1=data/tokens_eval_indep_f1:4`.
+
+| model | loss | loss en | loss id |
+|---|---|---|---|
+| Model B, `tokens_2x` (control) | 3.969 | 3.943 | 4.012 |
+| Model B 9x, seed 1337 | 3.603 | 3.581 | 3.639 |
+| Model B 9x, seed 2024 | 3.589 | 3.567 | 3.624 |
+
+Gain of Model B 9x over the control (loss of 9x minus loss of the control), on the
+full independent eval and on the subset:
+
+| | full: en / id / all | subset: en / id / all |
+|---|---|---|
+| seed 1337 | -0.364 / -0.222 / -0.305 | -0.362 / -0.373 / -0.366 |
+| seed 2024 | -0.376 / -0.236 / -0.318 | -0.375 / -0.389 / -0.380 |
+
+The hypothesis written down before the result was that the documents with core
+gambling terms held back the id gain: it counted as supported if the id gain on the
+subset was more than 0.02 larger, and the en gain was expected to stay the same. The
+id gain is larger by 0.151 (seed 1337) and 0.153 (seed 2024); the en gain changes by
+0.002 and 0.001. The id loss of the control rises when those documents are removed
+(3.980 to 4.012) while the id loss of 9x falls (3.758 to 3.639 and 3.744 to 3.624);
+this is consistent with such documents being easier for a model that saw them in
+training (the control) than for one that did not, which was not tested directly. The two evaluation sets have different windows, so absolute
+numbers are only indicative across sets; the gains within a set are the sound
+comparison.
+
+What this does not show: that the filter made the model better. The control was
+trained without the filter and on 4.2 times fewer tokens, so the filter is not
+isolated. The full independent eval stays the primary metric, because it is
+comparable with v4 and B1 (both trained on unfiltered data); the subset is
+secondary. Two seeds, one control seed.
 
 ## Model B 9x: generation check
 
-`scripts/eval_generation.py` (0.1.0) on `data/ckpt_b9x.pt` (step 23700, sha256
+`scripts/eval_generation.py` (0.1.0) on `data/ckpt_b9x.pt` (seed 1337, step
+23700, sha256
 `5ef282664c70fa6e971f250f78e0c970205350987a464740da50a590ad6c5c66`), same tokenizer,
 same 10 fixed prompts, 128 new tokens and 3 seeds as for v4, B1 and the Model B
 control. The prompt set has the same hash (`b093f42c6247`) in all four result files.
