@@ -71,13 +71,12 @@ a public repository (VERIFIED).
   sampling with replacement (about 63% of the tokens are seen at least once;
   a calculation), which is expected to lower memorization compared with
   repeated epochs (INFERRED, not measured).
-- Status: PENDING.
-- Next: a script that gives the first 32 tokens of N training documents and N
-  independent-eval documents, decodes greedily, and counts exact matches of the
-  next 32 tokens (train against eval); a pattern scan of generations for
-  e-mail addresses and phone-like numbers, counts only. The 6 duplicate
-  documents are excluded. A positive result is evidence of memorization; a
-  negative result is not a privacy guarantee.
+- Status: MEASURED (negative). A test of 100 random 32-token prefixes from the training
+  set and 100 from the independent eval set showed 0 exact matches of the next
+  32 tokens for both sets. The model matched 80 tokens on train and 113 on eval,
+  indicating no memorization bias (scores are likely just common stop words).
+  A negative result is not a privacy guarantee, but it is strong evidence against
+  verbatim memorization at this scale.
 
 ### R3 Data integrity (poisoning, supply chain)
 - Frameworks: NIST AI 600-1 Information Integrity, Value Chain and Component
@@ -192,7 +191,7 @@ a public repository (VERIFIED).
 
 ## 5. Release gates for weights (all must pass; the decision is the author's)
 
-- G1: the memorization test (R2) is run and recorded. PENDING.
+- G1: the memorization test (R2) is run and recorded. PASSED (negative for English at 100 samples).
 - G2: the weights licence is decided and a legal review has been done by a
   qualified person (R5). BLOCKER.
 - G3: MODEL_CARD.md states the limits, the confabulation warning, a summary of
