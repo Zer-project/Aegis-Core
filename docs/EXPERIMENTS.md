@@ -386,7 +386,8 @@ because the wall time includes startup and six evaluations.
 
 `scripts/train.py` v0.2.0 (commit `9e76e3f`), torch 2.11.0+cu130, 2 x Tesla T4
 (15,360 MiB each; only one is used), the 17M configuration (6 layers, 6 heads, 384)
-on `tokens_full`, batch 64, block 256, fp16, one of the two T4 GPUs used. Data hashes and the
+on `tokens_full`, batch 64, block 256, fp16, notebook private (reported by
+the author). Data hashes and the
 tokenizer hash were checked inside the notebook.
 
 - 100 steps run as 0-50 (`--stop-after 50`) and 50-100 (`--resume`); the two
@@ -533,7 +534,8 @@ id gain is larger by 0.151 (seed 1337) and 0.153 (seed 2024); the en gain change
 0.002 and 0.001. The id loss of the control rises when those documents are removed
 (3.980 to 4.012) while the id loss of 9x falls (3.758 to 3.639 and 3.744 to 3.624);
 this is consistent with such documents being easier for a model that saw them in
-training (the control) than for one that did not, which was not tested directly. The two evaluation sets have different windows, so absolute
+training (the control) than for one that did not, which was not tested directly.
+The two evaluation sets have different windows, so absolute
 numbers are only indicative across sets; the gains within a set are the sound
 comparison.
 
