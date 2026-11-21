@@ -66,6 +66,7 @@ def parse_args(argv=None):
     ap.add_argument("--copy-ckpt-to", default=None,
                     help="salin ckpt.pt dan log.jsonl ke folder ini setelah tiap "
                          "penyimpanan (best-effort)")
+    ap.add_argument("--init-ckpt", type=str, default=None, help="Path ke checkpoint untuk fine-tuning")
     return ap.parse_args(argv)
 
 
@@ -171,6 +172,11 @@ def run(a):
 
     torch.manual_seed(a.seed)
     model = AegisNano(cfg).to(dev)  # init di CPU (seed sama), lalu dipindah
+    if getattr(a, "init_ckpt", None):
+        print(f"Memuat bobot dari {a.init_ckpt}...")
+        ckpt = torch.load(a.init_ckpt, map_location="cpu", weights_only=True)
+        model.load_state_dict(ckpt["model"])
+        print("Bobot berhasil dimuat. Memulai fine-tuning...")
     params = list(model.parameters())
     opt = torch.optim.AdamW(
         [{"params": [p for p in params if p.dim() >= 2], "weight_decay": a.weight_decay},
