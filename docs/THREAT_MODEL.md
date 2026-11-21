@@ -73,7 +73,7 @@ a public repository (VERIFIED).
   repeated epochs (INFERRED, not measured).
 - Status: MEASURED (negative). A test of 100 random 32-token prefixes from the training
   set and 100 from the independent eval set showed 0 exact matches of the next
-  32 tokens for both sets. The model matched 80 tokens on train and 113 on eval,
+  32 tokens for both sets. The model matched 80-94 tokens on train and 105-113 on eval (en and id),
   indicating no memorization bias (scores are likely just common stop words).
   A negative result is not a privacy guarantee, but it is strong evidence against
   verbatim memorization at this scale.
