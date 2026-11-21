@@ -71,9 +71,9 @@ a public repository (VERIFIED).
   sampling with replacement (about 63% of the tokens are seen at least once;
   a calculation), which is expected to lower memorization compared with
   repeated epochs (INFERRED, not measured).
-- Status: MEASURED (negative). A test of 100 random 32-token prefixes from the training
-  set and 100 from the independent eval set showed 0 exact matches of the next
-  32 tokens for both sets. The model matched 80-94 tokens on train and 105-113 on eval (en and id),
+- Status: MEASURED (negative). Tests on 100 random 32-token prefixes from both
+  training and independent eval sets, run on Seed 1337 and Seed 2024, showed 0
+  exact matches of the next 32 tokens for all combinations. The model matched 80-94 tokens on train and 105-113 on eval (en and id),
   indicating no memorization bias (scores are likely just common stop words).
   A negative result is not a privacy guarantee, but it is strong evidence against
   verbatim memorization at this scale.
