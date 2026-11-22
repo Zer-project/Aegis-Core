@@ -266,3 +266,13 @@ advice.
 - Lozhkov, Ben Allal, von Werra, Wolf. FineWeb-Edu: the Finest Collection of
   Educational Content. 2024. doi:10.57967/hf/2497
 - Penedo et al. FineWeb2: One Pipeline to Scale Them All. 2025. arXiv:2506.20920
+
+## Cyber Security Data (Aegis-Sec v1)
+
+Data sourced on 2026-11-22 for the initial Aegis-Sec fine-tuning run.
+
+- **MITRE ATT&CK:** Enterprise STIX data (`enterprise-attack.json`) downloaded from `github.com/mitre/cti` (master branch). 2,228 documents processed (includes some revoked and deprecated objects). Warning: 92.8% of this dataset contains `(Citation: ...)` markers, which the model learned to mimic. Not filtered. License: MITRE grants a royalty-free license for research and commercial use, but requires copyright designation in copies.
+- **CWE (Common Weakness Enumeration):** Version 5.0 downloaded from `cwe.mitre.org`. 983 weaknesses processed. License: Free for research, development, and commercial purposes under CWE Terms of Use.
+- **CVE:** Download failed (404 Not Found). Not included in v1.
+
+**Note on Licence Compliance:** As of this commit, the weights for Aegis-Sec are strictly experimental and not published. If shared, the MITRE ATT&CK copyright and license terms must accompany the distribution.
