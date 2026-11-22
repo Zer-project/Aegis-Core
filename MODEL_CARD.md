@@ -15,7 +15,7 @@ Weights are **not published**; see "License".
 - Tokenizer: byte-level BPE (Hugging Face `tokenizers`), vocabulary 16,384,
   trained on the training split only. Tokenizer sha256 `a31e3dcf2c889f7b44ced454e560676767fcba0e871fc9bb9c4c3cb017cf4153`.
 - Parameters: 17,011,584.
-- Source code: Apache-2.0, https://github.com/Zer-project/Aegis-Core
+- Source code: Apache-2.0, https://github.com/zerforge/Aegis-Core
 
 ## Model B (GPU)
 

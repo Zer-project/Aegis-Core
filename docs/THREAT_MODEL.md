@@ -71,12 +71,33 @@ a public repository (VERIFIED).
   sampling with replacement (about 63% of the tokens are seen at least once;
   a calculation), which is expected to lower memorization compared with
   repeated epochs (INFERRED, not measured).
-- Status: MEASURED (negative). Tests on 100 random 32-token prefixes from both
-  training and independent eval sets, run on Seed 1337 and Seed 2024, showed 0
-  exact matches of the next 32 tokens for all combinations. The model matched 80-94 tokens on train and 105-113 on eval (en and id),
-  indicating no memorization bias (scores are likely just common stop words).
-  A negative result is not a privacy guarantee, but it is strong evidence against
-  verbatim memorization at this scale.
+- Status: RUN once; no evidence of memorization at this sample size, but the
+  measurement is not validated and not conclusive.
+- Run (2026-11-22, scripts/eval_memorization.py, written and run by the author
+  without review; VERIFIED output): 100 random 64-token windows per set taken
+  from the token shards (not aligned to documents, so a window may cross a
+  document boundary), the first 32 tokens as prefix, and a greedy continuation
+  of 32 tokens compared with the real ones. Training windows come from
+  data/tokens_9x_clean, eval windows from the independent eval shards. Seed
+  1337 was run for en and id, seed 2024 for en only. Result: 0 exact matches
+  and 0 runs of 16 or more matching tokens in every cell. Matching tokens out
+  of 3,200 per cell: seed 1337 en 80 (train) and 113 (eval), id 94 and 105;
+  seed 2024 en 89 and 114.
+- Greedy: model.generate divides the logits by max(temperature, 1e-8), so
+  temperature 0.0 is greedy in effect (source read; VERIFIED).
+- Limits: 0 of 100 bounds the rate of exact matches on random windows only at
+  about 3-4% (95% upper bound). 100 windows are about 3e-5 of the corpus, and
+  real memorization concentrates in rare or heavily duplicated strings that
+  random windows rarely hit. The matching-token counts have the size expected
+  without memorization (rough estimate, INFERRED: about a third of the first
+  position right plus chance agreement on common tokens afterwards). The
+  evaluation function has no test and there is no positive control (a model
+  known to memorize). A negative result is not a privacy guarantee.
+- Next: version 2 of the script: a teacher-forced loss comparison between
+  training and eval windows (about 500 per language, with intervals), a unit
+  test with a model made to memorize, the id run for seed 2024, and the 6
+  duplicate documents excluded; plus a pattern scan of generations for e-mail
+  addresses and phone-like numbers, counts only.
 
 ### R3 Data integrity (poisoning, supply chain)
 - Frameworks: NIST AI 600-1 Information Integrity, Value Chain and Component
@@ -191,7 +212,8 @@ a public repository (VERIFIED).
 
 ## 5. Release gates for weights (all must pass; the decision is the author's)
 
-- G1: the memorization test (R2) is run and recorded. PASSED (negative for English at 100 samples).
+- G1: the memorization test (R2) is run and recorded. PARTIAL: one run with
+  N = 100 and a script that is not yet validated (see R2); version 2 pending.
 - G2: the weights licence is decided and a legal review has been done by a
   qualified person (R5). BLOCKER.
 - G3: MODEL_CARD.md states the limits, the confabulation warning, a summary of
@@ -205,9 +227,23 @@ a public repository (VERIFIED).
 
 ## 6. Gate for Aegis-Sec (fine-tuning toward cyber security and red team)
 
-Status: proposed next stage by the author, not started. Everything below is
-PENDING until the author decides. No data collection for this stage starts
-before S1 to S3 are written down and approved.
+Status: started on 2026-11-22, before this gate was satisfied. Two public
+sources (MITRE ATT&CK enterprise STIX data from the mitre/cti master branch,
+and the CWE catalogue version 5.0) were downloaded, tokenized (3,211
+documents, 676,072 tokens) and used for a 200-step CPU fine-tune of Model B
+(seed 1337), with no holdout set, no entry in DATA.md and no recorded licence
+audit (VERIFIED, command output). The licence terms were read afterwards (see
+below). S1 to S3 are still PENDING approval; until they are approved and a
+holdout exists, outputs of this stage are not reported as results, and no
+weights of this stage are shared.
+
+Licence terms read on 2026-11-22 (web search, REPORTED): MITRE grants a
+royalty-free licence to use ATT&CK for research, development and commercial
+purposes; copies must reproduce MITRE's copyright designation and the licence;
+the branding rules ask for "MITRE ATT&CK" at the first reference and forbid
+implying MITRE's affiliation or using ATT&CK in product names. CWE is free to
+use for research, development and commercial purposes under its terms of use.
+Whether weights count as a copy is not settled here (this is not legal advice).
 
 - S1 Purpose. In scope: defensive and analytical use (log and alert triage,
   explaining vulnerabilities and advisories, detection rules, secure-code
