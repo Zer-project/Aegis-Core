@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import data_loader as dl  # noqa: E402
 from model import AegisConfig, AegisNano  # noqa: E402
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 CKPT, LOG = "ckpt.pt", "log.jsonl"
 SCHED_KEYS = ("seed", "batch_size", "block_size", "max_steps", "lr", "min_lr",
               "warmup", "weight_decay", "grad_clip")
@@ -89,6 +89,7 @@ def sha256_file(p):
 
 def save_ckpt(path, payload):
     tmp = path.with_name(path.name + ".tmp")
+    tmp["init_ckpt_sha256"] = init_ckpt_sha256
     torch.save(payload, tmp)
     with open(tmp, "rb") as f:
         os.fsync(f.fileno())
@@ -177,6 +178,12 @@ def run(a):
         ckpt = torch.load(a.init_ckpt, map_location="cpu", weights_only=True)
         model.load_state_dict(ckpt["model"])
         print("Bobot berhasil dimuat. Memulai fine-tuning...")
+        import hashlib
+        _h = hashlib.sha256()
+        with open(a.init_ckpt, "rb") as _f:
+            for _c in iter(lambda: _f.read(1 << 20), b""):
+                _h.update(_c)
+        init_ckpt_sha256 = _h.hexdigest()
     params = list(model.parameters())
     opt = torch.optim.AdamW(
         [{"params": [p for p in params if p.dim() >= 2], "weight_decay": a.weight_decay},
@@ -185,6 +192,7 @@ def run(a):
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     start = 0
+    init_ckpt_sha256 = None
     if a.resume:
         c = torch.load(ck, map_location="cpu", weights_only=True)
         if c["tokenizer_sha256"] != tok_sha:
