@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import data_loader as dl  # noqa: E402
 from model import AegisConfig, AegisNano  # noqa: E402
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 CKPT, LOG = "ckpt.pt", "log.jsonl"
 SCHED_KEYS = ("seed", "batch_size", "block_size", "max_steps", "lr", "min_lr",
               "warmup", "weight_decay", "grad_clip")
@@ -265,6 +265,7 @@ def run(a):
             if (step + 1) % a.ckpt_interval == 0 or last:
                 save_ckpt(ck, {"model": model.state_dict(), "optimizer": opt.state_dict(),
                                "step": step + 1, "model_cfg": asdict(cfg), "sched": sched,
+                   "init_ckpt_sha256": init_ckpt_sha256,
                                "torch_rng": torch.get_rng_state(), "tokenizer_sha256": tok_sha,
                                "data_meta_sha256": data_sha, "script_version": __version__,
                                "amp": a.amp,
