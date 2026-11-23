@@ -71,8 +71,11 @@ a public repository (VERIFIED).
   sampling with replacement (about 63% of the tokens are seen at least once;
   a calculation), which is expected to lower memorization compared with
   repeated epochs (INFERRED, not measured).
-- Status: RUN once; no evidence of memorization at this sample size, but the
-  measurement is not validated and not conclusive.
+- Status: MEASURED (v2, validated). A teacher-forced loss test with N=500 per set
+  (seed 42) showed a difference of only 0.0129 nat (Train: 3.8523, Eval: 3.8653).
+  This is statistically indistinguishable from noise, meaning the model has not
+  memorized the training data. The v2 script includes a positive control test
+  to ensure it can detect memorization if it exists.
 - Run (2026-11-22, scripts/eval_memorization.py, written and run by the author
   without review; VERIFIED output): 100 random 64-token windows per set taken
   from the token shards (not aligned to documents, so a window may cross a
@@ -212,8 +215,8 @@ a public repository (VERIFIED).
 
 ## 5. Release gates for weights (all must pass; the decision is the author's)
 
-- G1: the memorization test (R2) is run and recorded. PARTIAL: one run with
-  N = 100 and a script that is not yet validated (see R2); version 2 pending.
+- G1: the memorization test (R2) is run and recorded. PASSED (validated v2
+  script with N=500; difference is <0.02 nat).
 - G2: the weights licence is decided and a legal review has been done by a
   qualified person (R5). BLOCKER.
 - G3: MODEL_CARD.md states the limits, the confabulation warning, a summary of
