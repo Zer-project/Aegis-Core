@@ -636,3 +636,26 @@ python scripts/evaluate_lm.py --ckpt b9x=data/ckpt_b9x.pt \
 
 The training run used GPU hardware, so the weights are not expected to be
 bit-identical on a rerun.
+
+## Aegis-Sec v2: Cleaned Data Fine-Tuning (2026-11-23)
+
+Following the data audit, we rebuilt the Aegis-Sec dataset to filter out
+revoked/deprecated MITRE objects and removed `(Citation: ...)` artifacts.
+
+**Training:**
+- Data: 2,526 train docs (458,935 tokens), 281 eval docs (48,364 tokens).
+- Steps: 200, LR: 5e-5, Batch: 8.
+- Checkpoint: `data/runs_aegis_sec_v2_fixed/ckpt.pt` (provenance tracked).
+
+**Evaluation (Holdout):**
+- Loss dropped from 2.397 (step 49) to **2.077** (step 199), proving the
+  model learned patterns without overfitting.
+
+**Generation Check:**
+- Prompt: "To mitigate SQL injection, a developer should"
+- v1 (Dirty data): `" take action\n(Citation: Microsoft SQL Tools Injection)"`
+- v2 (Clean data): `" take into an operation of an adversary's own account,
+  possibly by creating a command-line account that cannot be used to compromise
+  the system."`
+- Conclusion: The citation artifact is gone, and the model generates more
+  natural (though still hallucinated) security text.
