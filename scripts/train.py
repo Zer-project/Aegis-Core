@@ -89,7 +89,6 @@ def sha256_file(p):
 
 def save_ckpt(path, payload):
     tmp = path.with_name(path.name + ".tmp")
-    tmp["init_ckpt_sha256"] = init_ckpt_sha256
     torch.save(payload, tmp)
     with open(tmp, "rb") as f:
         os.fsync(f.fileno())
@@ -173,6 +172,7 @@ def run(a):
 
     torch.manual_seed(a.seed)
     model = AegisNano(cfg).to(dev)  # init di CPU (seed sama), lalu dipindah
+    init_ckpt_sha256 = None
     if getattr(a, "init_ckpt", None):
         print(f"Memuat bobot dari {a.init_ckpt}...")
         ckpt = torch.load(a.init_ckpt, map_location="cpu", weights_only=True)
@@ -192,7 +192,6 @@ def run(a):
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     start = 0
-    init_ckpt_sha256 = None
     if a.resume:
         c = torch.load(ck, map_location="cpu", weights_only=True)
         if c["tokenizer_sha256"] != tok_sha:
@@ -213,6 +212,7 @@ def run(a):
             scaler.load_state_dict(c["scaler"])
         torch.set_rng_state(c["torch_rng"])
         start = int(c["step"])
+        init_ckpt_sha256 = c.get("init_ckpt_sha256")
 
     end = a.max_steps if a.stop_after is None else min(a.max_steps, a.stop_after)
     if start >= end:
