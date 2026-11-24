@@ -48,7 +48,7 @@ def test_checkpoint_memuat_kunci_amp_default_off(data):
     tr.run(targs(data, "--max-steps", "3"))
     c = torch.load(data / "run" / "ckpt.pt", weights_only=True)
     assert c["amp"] == "off" and c["scaler"] is None
-    assert c["script_version"] == tr.__version__ == "0.2.0"
+    assert c["script_version"] == tr.__version__
 
 
 def test_amp_fp16_di_cpu_ditolak(data):
