@@ -103,3 +103,9 @@ def test_resume_memuat_dengan_map_location_cpu(data, monkeypatch):
     monkeypatch.setattr(torch, "load", spy)
     tr.run(targs(data, "--max-steps", "20", "--resume"))
     assert seen == ["cpu"]
+
+
+def test_min_lr_lebih_besar_dari_lr_ditolak(data):
+    with pytest.raises(ValueError, match="min-lr"):
+        tr.run(targs(data, "--lr", "5e-5"))  # min-lr default 3e-4 > lr
+    tr.run(targs(data, "--lr", "5e-5", "--min-lr", "5e-5", "--max-steps", "2"))

@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import data_loader as dl  # noqa: E402
 from model import AegisConfig, AegisNano  # noqa: E402
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 CKPT, LOG = "ckpt.pt", "log.jsonl"
 SCHED_KEYS = ("seed", "batch_size", "block_size", "max_steps", "lr", "min_lr",
               "warmup", "weight_decay", "grad_clip")
@@ -143,6 +143,9 @@ def evaluate(model, a, tok_sha, dev=torch.device("cpu"), use_amp=False):
 def run(a):
     if a.max_steps < 1 or a.log_interval < 1 or a.ckpt_interval < 1 or a.warmup < 0:
         raise ValueError("parameter tidak valid")
+    if a.min_lr > a.lr:
+        # Jadwal cosine akan NAIK dari lr ke min_lr (kasus nyata: --lr 5e-5 dengan min-lr default 3e-4).
+        raise ValueError(f"--min-lr ({a.min_lr}) tidak boleh lebih besar dari --lr ({a.lr})")
     if a.resume and a.overwrite:
         raise ValueError("--resume dan --overwrite tidak boleh bersamaan")
     if a.device == "cuda" and not torch.cuda.is_available():
