@@ -230,15 +230,15 @@ a public repository (VERIFIED).
 
 ## 6. Gate for Aegis-Sec (fine-tuning toward cyber security and red team)
 
-Status: started on 2026-11-22, before this gate was satisfied. Two public
-sources (MITRE ATT&CK enterprise STIX data from the mitre/cti master branch,
-and the CWE catalogue version 5.0) were downloaded, tokenized (3,211
-documents, 676,072 tokens) and used for a 200-step CPU fine-tune of Model B
-(seed 1337), with no holdout set, no entry in DATA.md and no recorded licence
-audit (VERIFIED, command output). The licence terms were read afterwards (see
-below). S1 to S3 are still PENDING approval; until they are approved and a
-holdout exists, outputs of this stage are not reported as results, and no
-weights of this stage are shared.
+Status: started on 2026-11-22, before this gate was satisfied. The first run
+(MITRE ATT&CK enterprise STIX data from the mitre/cti master branch and CWE
+5.0; 3,211 documents, 676,072 tokens; 200-step CPU fine-tune of Model B, seed
+1337) had no holdout set, no DATA.md entry and no licence audit (VERIFIED,
+command output). Superseded by Aegis-Sec v2 (cleaned data, 2,526 train and 281
+eval documents, eval loss 2.397 to 2.077; REPORTED in docs/EXPERIMENTS.md, not
+re-run for this edit), which does have a holdout. S1 to S3 are still PENDING
+the owner's approval; until then, outputs of this stage are not reported as
+capability results, and no weights of this stage are shared.
 
 Licence terms read on 2026-11-22 (web search, REPORTED): MITRE grants a
 royalty-free licence to use ATT&CK for research, development and commercial
@@ -280,6 +280,22 @@ Whether weights count as a copy is not settled here (this is not legal advice).
 - S7 Legal. Security testing needs authorisation; the law of the author's
   country and of the places where the model is used is checked by a qualified
   person.
+
+## 6a. Proposed additions for the product-model and agent track (PROPOSED, Phase 0)
+
+Not approved; the owner reviews. See docs/ROADMAP.md and docs/DECISIONS.md.
+
+- N1 Licence of the adopted base model and of derived weights (extends R5).
+- N2 Benchmark contamination from MITRE/CWE training text (INFERRED).
+- N3 Dual-use uplift after adaptation; compare with the base (S4c).
+- N4 Prompt injection through tool output or scanned content (OWASP LLM01).
+- N5 Agent acting outside authorised scope (R9, S6).
+- N6 Secrets and target data in logs or prompts.
+- N7 Sandbox escape or unintended network reach of executors.
+- N8 Overreliance on model-written findings in reports (R1, R8).
+- N9 Weights or adapter leakage after adaptation (R4).
+
+Mitigations are decided per phase; none is claimed to exist yet.
 
 ## 7. Frameworks used and what is not claimed
 
