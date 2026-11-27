@@ -45,6 +45,38 @@ version-checked at that time). 3. Execution/CTF/range tasks (isolated).
 Contamination warning (INFERRED): MITRE/CWE training text may overlap with
 benchmark items built from the same sources; check before reporting scores.
 
+## Phase 1 inputs (read 2026-11-28; Hugging Face cards and dataset pages, via fetch)
+
+| | Olmo-3-1025-7B | Qwen3-8B-Base |
+|---|---|---|
+| licence (card) | Apache 2.0 | Apache 2.0 |
+| size | 7B | 8.2B (6.95B non-embedding) |
+| context | 65,536 | 32,768 |
+| training data | Dolma 3 (stage 1: 5.93T tokens) | 36T tokens, 119 languages |
+| transformers | >= 4.57.0 | >= 4.51.0 |
+
+The Olmo 3 card warns that the models can easily be prompted to produce harmful content and
+that their statements need checking; a note about research and educational use was also
+reported by the fetch tool, wording not verified: needs a legal read before any release (G2).
+Newer Qwen releases exist (a Qwen3.8 headline appeared in search); not evaluated here.
+
+Public benchmarks found (S4a asks for a version check at use time):
+- CTIBench: Hugging Face card says licence CC BY-NC-SA 4.0 (non-commercial, share-alike);
+  configs cti-mcq, cti-rcm, cti-vsp, cti-taa (row counts not stated on the card page read);
+  zero-shot CTI tasks. Use for evaluation only, not training; check the licence against the
+  intended release (G2).
+- CyberMetric: multiple choice A-D in sizes 80, 500, 2,000 and 10,000; built with LLMs and
+  RAG and human-validated (README); no licence stated on the README page read, so treat as
+  unknown until checked.
+Both are English (INFERRED). Indonesian cyber evaluation needs a project-written set.
+Contamination: MITRE/CWE text used for Aegis-Sec training may overlap with CTIBench items
+(INFERRED); compare scores before and after domain adaptation with that in mind.
+
+Model memory (INFERRED, to measure): 7-8B parameters at 2 bytes is about 14-17 GB of weights.
+Kaggle offers T4 x2 (announcement title seen; per-GPU memory 16 GB is the NVIDIA T4
+specification, not read from Kaggle) so one model can be split across two GPUs, or loaded in
+4-bit on one. T4 has no native bf16, so fp16 is used; fp16 overflow risk is not tested.
+
 ## Compute
 
 Local machine: WSL shows 3.8 GiB RAM and no GPU (VERIFIED, owner's output,
@@ -52,7 +84,10 @@ Local machine: WSL shows 3.8 GiB RAM and no GPU (VERIFIED, owner's output,
 for Aegis-Nano, not for 7-8B models. Kaggle free GPU is the candidate for Track B.
 Owner's account page (screenshot 2026-11-26) shows "GPU 30h available of 30h";
 the period (probably weekly) and session limits are NOT shown and not verified.
-Kaggle documentation pages could not be read by the tooling. Inference memory for
+Kaggle documentation pages could not be read by the tooling. A Kaggle announcement
+says the NVIDIA Tesla P100 is retired from 15 September 2026 (page text truncated; remaining
+options not read), so plan for T4 x2. A Kaggle discussion title reports GPU availability
+degrading; session length, internet access rules and phone verification are NOT verified. Inference memory for
 7-8B fp16 is about 14-16 GB (INFERRED), tight on one T4 (no native bf16); to be
 measured in Phase 1.
 
