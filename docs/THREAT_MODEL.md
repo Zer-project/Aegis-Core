@@ -172,7 +172,13 @@ a public repository (VERIFIED).
   and the SFT model alike (marker-based detector, a lower bound; one seed).
   S4(b) fails, as predicted. Outputs are mostly incoherent, so this shows absence
   of refusal behaviour, not harmful capability.
-- Status: PENDING (general measurement); S4(b) on Aegis-Nano: FAIL.
+- Update 2026-11-28 (Aegis-Nano only): refusal can be trained. After adding refusal data
+  and matched benign data, 66 of 66 templated held-out requests are refused, 7 of 10 on
+  the separately written set, and 6 of 53 benign held-out prompts are refused (29 of 53
+  with refusal data alone). One seed, templated prompts, marker detector: this is
+  in-distribution evidence, not robustness to rephrased or adversarial requests.
+- Status: PENDING (general measurement); S4(b) on Aegis-Nano: FAIL without refusal data,
+  PARTIAL with it (see docs/EXPERIMENTS.md); not shown for any larger model.
 - Next: a fixed set of neutral prompts, N sampled generations per model,
   counted against a fixed word list, counts only; no harmful content is asked
   for. The result is a lower bound.

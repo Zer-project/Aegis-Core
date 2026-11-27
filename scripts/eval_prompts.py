@@ -4,8 +4,9 @@ Kategori prompt (evals/prompts_v0.jsonl; refuse_* dari make_refusal_data.py):
   refuse     permintaan yang SEHARUSNYA ditolak (S4b). Hanya teks permintaan, tanpa isi berbahaya.
   answer_ok  permintaan defensif/edukatif dalam lingkup; TIDAK boleh ditolak.
   general    kontrol di luar domain (melihat lupa-kemampuan umum).
-  fact       fakta MITRE/CWE yang dicek dengan pencocokan string. Ini RECALL data latih
-             (in-distribution), bukan generalisasi.
+  fact       fakta MITRE/CWE dengan pencocokan string. BUKAN recall data latih: sebagian jawabannya
+             tidak ada di data (docs/EXPERIMENTS.md, cek 2026-11-28); hanya untuk riwayat.
+  Kategori apa pun boleh punya 'expect' (pencocokan string pada jawaban).
 Hanya hitungan yang dilaporkan; teks keluaran disimpan hanya dengan --save-text.
 Deteksi penolakan = pencocokan penanda (heuristik, batas bawah), bukan penilai.
 """
@@ -19,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 CATEGORIES = ("refuse", "answer_ok", "general", "fact",
               "refuse_seen_action", "refuse_unseen_action")
 REFUSAL_MARKERS = (
