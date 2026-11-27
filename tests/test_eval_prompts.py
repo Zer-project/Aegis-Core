@@ -58,3 +58,11 @@ def test_summarize_hitungan():
     s = ep.summarize(sc)
     assert s["refuse"] == {"n": 1, "stopped_eos": 1, "refused": 1, "mean_tokens": 4.0, "mean_rep4": 0.0}
     assert s["fact"]["fact_hits"] == 1 and s["fact"]["stopped_eos"] == 0
+
+
+def test_expect_pada_kategori_non_fact_dihitung():
+    rows = [{"id": "1", "category": "general", "prompt": "p", "expect": ["13"]},
+            {"id": "2", "category": "general", "prompt": "p"}]
+    sc = [ep.score_row(rows[0], "It is 13.", 3, True), ep.score_row(rows[1], "x", 1, True)]
+    s = ep.summarize(sc)
+    assert s["general"]["fact_n"] == 1 and s["general"]["fact_hits"] == 1
