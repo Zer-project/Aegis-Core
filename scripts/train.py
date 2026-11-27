@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import data_loader as dl  # noqa: E402
 from model import AegisConfig, AegisNano  # noqa: E402
 
-__version__ = "0.2.2"
+__version__ = "0.3.1"
 CKPT, LOG = "ckpt.pt", "log.jsonl"
 SCHED_KEYS = ("seed", "batch_size", "block_size", "max_steps", "lr", "min_lr",
               "warmup", "weight_decay", "grad_clip")
@@ -67,6 +67,9 @@ def parse_args(argv=None):
                     help="salin ckpt.pt dan log.jsonl ke folder ini setelah tiap "
                          "penyimpanan (best-effort)")
     ap.add_argument("--init-ckpt", type=str, default=None, help="Path ke checkpoint untuk fine-tuning")
+    ap.add_argument("--sft", action="store_true",
+                    help="data dari prepare_sft.py: loss hanya pada token respons (y=-1 pada "
+                         "prompt, ignore_index model); wajib cocok dengan meta data (sft=true)")
     return ap.parse_args(argv)
 
 
@@ -120,13 +123,14 @@ def evaluate(model, a, tok_sha, dev=torch.device("cpu"), use_amp=False):
     shards, _ = dl.load_split(a.data_dir, "eval", tok_sha)
     if not any(len(s) > a.block_size for s in shards):
         return None
+    get_batch = dl.get_batch_sft if getattr(a, "sft", False) else dl.get_batch
     model.eval()
     try:
         tot = 0.0
         with torch.no_grad():
             for i in range(a.eval_batches):
-                x, y = dl.get_batch(a.data_dir, "eval", a.batch_size, a.block_size,
-                                    seed=a.seed, step=i, expected_tokenizer_sha256=tok_sha)
+                x, y = get_batch(a.data_dir, "eval", a.batch_size, a.block_size,
+                                 seed=a.seed, step=i, expected_tokenizer_sha256=tok_sha)
                 x, y = x.to(dev), y.to(dev)
                 with amp_ctx(dev, use_amp):
                     _, loss = model(x, y)
@@ -139,6 +143,9 @@ def evaluate(model, a, tok_sha, dev=torch.device("cpu"), use_amp=False):
 def run(a):
     if a.max_steps < 1 or a.log_interval < 1 or a.ckpt_interval < 1 or a.warmup < 0:
         raise ValueError("parameter tidak valid")
+    if a.min_lr > a.lr:
+        # Jadwal cosine akan NAIK dari lr ke min_lr (kasus nyata: --lr 5e-5 dengan min-lr default 3e-4).
+        raise ValueError(f"--min-lr ({a.min_lr}) tidak boleh lebih besar dari --lr ({a.lr})")
     if a.resume and a.overwrite:
         raise ValueError("--resume dan --overwrite tidak boleh bersamaan")
     if a.device == "cuda" and not torch.cuda.is_available():
@@ -165,6 +172,11 @@ def run(a):
     mpath = Path(a.data_dir) / "meta_train.json"
     meta = json.loads(mpath.read_text(encoding="utf-8"))
     tok_sha, vocab = meta["tokenizer_json_sha256"], int(meta["vocab_size"])
+    use_sft = bool(getattr(a, "sft", False))
+    if use_sft != (meta.get("sft") is True):
+        raise ValueError("--sft harus sesuai meta data: wajib untuk data SFT (sft=true) "
+                         "dan ditolak untuk data pretraining")
+    get_batch = dl.get_batch_sft if use_sft else dl.get_batch
     data_sha = sha256_file(mpath)
     cfg = AegisConfig(vocab_size=vocab, block_size=a.block_size, n_layer=a.n_layer,
                       n_head=a.n_head, n_embd=a.n_embd, dropout=a.dropout)
@@ -204,6 +216,8 @@ def run(a):
             raise ValueError("seed/jadwal/ukuran batch di checkpoint berbeda")
         if c.get("amp", "off") != a.amp:
             raise ValueError("mode --amp di checkpoint berbeda")
+        if bool(c.get("sft", False)) != use_sft:
+            raise ValueError("mode --sft di checkpoint berbeda")
         model.load_state_dict(c["model"])
         opt.load_state_dict(c["optimizer"])
         if use_amp:
@@ -226,8 +240,8 @@ def run(a):
             lr = lr_at(step, a.lr, a.min_lr, a.warmup, a.max_steps)
             for g in opt.param_groups:
                 g["lr"] = lr
-            x, y = dl.get_batch(a.data_dir, "train", a.batch_size, a.block_size,
-                                seed=a.seed, step=step, expected_tokenizer_sha256=tok_sha)
+            x, y = get_batch(a.data_dir, "train", a.batch_size, a.block_size,
+                             seed=a.seed, step=step, expected_tokenizer_sha256=tok_sha)
             x, y = x.to(dev), y.to(dev)
             opt.zero_grad(set_to_none=True)
             with amp_ctx(dev, use_amp):
@@ -268,7 +282,7 @@ def run(a):
                    "init_ckpt_sha256": init_ckpt_sha256,
                                "torch_rng": torch.get_rng_state(), "tokenizer_sha256": tok_sha,
                                "data_meta_sha256": data_sha, "script_version": __version__,
-                               "amp": a.amp,
+                               "amp": a.amp, "sft": use_sft,
                                "scaler": scaler.state_dict() if use_amp else None})
                 if a.copy_ckpt_to:
                     mirror(out, a.copy_ckpt_to)

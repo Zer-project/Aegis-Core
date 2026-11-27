@@ -659,3 +659,83 @@ revoked/deprecated MITRE objects and removed `(Citation: ...)` artifacts.
   the system."`
 - Conclusion: The citation artifact is gone, and the model generates more
   natural (though still hallucinated) security text.
+
+## Aegis-Instruct v1: SFT pipeline and first behavioural evaluation (2026-11-26)
+
+Purpose: test the instruction-tuning pipeline (response-only loss) end to end on
+Aegis-Nano. Not a capability result. Branch `fase0-sft`; code: scripts/format_cyber_sft.py,
+prepare_sft.py, data_loader.get_batch_sft, train.py `--sft`, eval_sft_loss.py,
+eval_prompts.py. Unit tests: 201 passed on the owner's machine (VERIFIED).
+
+**Data (VERIFIED, command output).** The 2,526 train and 281 eval documents of
+Aegis-Sec v2 were turned into prompt/response pairs by fixed templates
+(`### User:\n{instruction}\n### Assistant:\n`; mitre 1,643 + cwe 883 train; mitre 181 +
+cwe 100 eval; none skipped). Tokens: train 489,409 of which 410,309 count for
+the loss (response + EOS); eval 51,725 and 42,909. Tokenizer sha256 `a31e3dcf...`.
+The templates teach the answer FORMAT, not new knowledge or instruction variety.
+
+**Runs (CPU, WSL, 3.8 GiB RAM, batch 4, seed 1337, init from a checkpoint, `--sft`).**
+- smoke (60 steps, init `ckpt_b9x.pt`): first run used `--lr 5e-5` without `--min-lr`;
+  the default `--min-lr 3e-4` made the cosine schedule RISE to about 3e-4. Found from
+  log.jsonl; fixed by rejecting `min_lr > lr` (train.py 0.3.1, commit ea61df9). Its loss
+  numbers are not used. Rerun with `--min-lr 5e-5`: 60 steps in 6 min 34 s.
+- instruct_v1 (600 steps, init `runs_aegis_sec_v2_fixed/ckpt.pt`, lr 5e-5 to 1e-5,
+  warmup 20, eval every 100 steps). Wall time was not recorded.
+
+**Response-only NLL on the same SFT eval data** (eval_sft_loss.py: non-overlapping
+256-token windows, 202 windows, 42,897 target tokens; VERIFIED, one seed, no interval):
+
+| checkpoint | sha256 (first 8) | NLL | ppl |
+|---|---|---|---|
+| ckpt_b9x (base) | 5ef28266 | 3.4898 | 32.8 |
+| Aegis-Sec v2 (200 steps, plain text) | 8a0ae6ba | 2.3458 | 10.4 |
+| smoke rerun (60 steps SFT from base) | 4814672c | 2.9254 | 18.6 |
+| instruct_v1 (600 steps from Sec v2) | 3a78a5b8 | 2.3007 | 9.98 |
+
+instruct_v1 is 0.045 nat below Sec v2: too small to call an improvement from one seed.
+Sec v2 was trained on the same documents as the SFT data, so these numbers are
+held-out only in the sense of the eval split, not new knowledge. train.py's own eval loss
+(2.2645) agrees roughly with eval_sft_loss (2.3007). Eval loss during instruct_v1 fell
+monotonically: 2.391, 2.338, 2.311, 2.285, 2.271, 2.265 at steps 99 to 599 (no overfit signal;
+the last 100 steps gained 0.006).
+
+**Behavioural suite v0.1** (evals/prompts_v0.jsonl, 40 prompts, 10 per category,
+temperature 0.3, top-k 40, seed 1, 160 new tokens; counts only; VERIFIED output):
+
+| checkpoint | stopped at EOS (of 40) | refused (refuse set, of 10) | refused (all 40) | fact hits (of 10) |
+|---|---|---|---|---|
+| base | 0 | 0 | 0 | 0 |
+| Sec v2 | 0 | 0 | 0 | 0 |
+| instruct_v1 | 36 | 0 | 0 | 0 |
+
+- SFT taught the model to stop: 36 of 40 outputs end at EOS (mean 27 to 61 tokens
+  against 160 for the others). Four generations read by hand earlier (seed 1) followed
+  the format but were wrong or degenerate: CWE-79 not described as cross-site
+  scripting, a looping Process Injection text, and a MITRE software entry with
+  attack.mitre.org links as the answer to "capital of France" (the links were not
+  checked; confabulation, R1).
+- No refusal anywhere (0 of 40, including the 10 requests that should be refused).
+  S4(b) fails, as expected without refusal data (R6). The detector is a marker
+  list: a lower bound, and the outputs of this model are mostly incoherent text.
+- Fact hits are 0 of 10 for every checkpoint. Do NOT read this as "model forgot": the
+  fact prompts ask ID from name ("Which CWE ID is ...", "technique ID for ..."), while the
+  training pairs go name to description. Whether the MITRE data even contains technique IDs
+  is NOT verified (the parsed format is `Title:`/`Description:`). The suite's docstring calls
+  `fact` "recall of training data"; that claim is unverified until the data is checked.
+- rep4 is lower for instruct_v1 mostly because outputs are shorter; length is a confound.
+
+**Not established:** any gain in cyber knowledge; behaviour across seeds; whether `general`
+answers are correct (the suite has no expected answers for them yet).
+
+```bash
+python scripts/format_cyber_sft.py --input data/cyber_dataset/aegis_sec_v2_train.jsonl --output data/cyber_dataset/aegis_sec_v2_sft_train.jsonl
+python scripts/format_cyber_sft.py --input data/cyber_dataset/aegis_sec_v2_eval.jsonl  --output data/cyber_dataset/aegis_sec_v2_sft_eval.jsonl
+python scripts/prepare_sft.py --files data/cyber_dataset/aegis_sec_v2_sft_train.jsonl --split train --tokenizer-dir data/tokenizer_cmp/v16384 --out-dir data/tokens_aegis_instruct_v1
+python scripts/prepare_sft.py --files data/cyber_dataset/aegis_sec_v2_sft_eval.jsonl  --split eval  --tokenizer-dir data/tokenizer_cmp/v16384 --out-dir data/tokens_aegis_instruct_v1
+python scripts/train.py --sft --data-dir data/tokens_aegis_instruct_v1 --out-dir data/runs_aegis_instruct_v1 \
+  --init-ckpt data/runs_aegis_sec_v2_fixed/ckpt.pt --n-layer 8 --n-head 8 --n-embd 512 --block-size 256 \
+  --batch-size 4 --max-steps 600 --lr 5e-5 --min-lr 1e-5 --warmup 20 --log-interval 20 \
+  --eval-interval 100 --eval-batches 20 --ckpt-interval 100 --seed 1337 --time-budget-hours 1.5
+python scripts/eval_sft_loss.py --ckpt data/runs_aegis_instruct_v1/ckpt.pt --tokenizer-dir data/tokenizer_cmp/v16384 --data-dir data/tokens_aegis_instruct_v1 --out data/eval_sft/instruct_v1.json
+python scripts/eval_prompts.py --ckpt data/runs_aegis_instruct_v1/ckpt.pt --tokenizer-dir data/tokenizer_cmp/v16384 --out data/eval_sft/behav_instruct_v1.json
+```
