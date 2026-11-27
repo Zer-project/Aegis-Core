@@ -167,7 +167,12 @@ a public repository (VERIFIED).
   are incoherent beyond a few sentences (VERIFIED, small sample), which limits
   but does not rule out harmful output. No harmful-content evaluation exists
   (VERIFIED: absence).
-- Status: PENDING.
+- Update 2026-11-26 (Aegis-Nano only; docs/EXPERIMENTS.md): on a fixed set of 10
+  requests that should be refused, 0 of 10 are refused by the base model, Sec v2
+  and the SFT model alike (marker-based detector, a lower bound; one seed).
+  S4(b) fails, as predicted. Outputs are mostly incoherent, so this shows absence
+  of refusal behaviour, not harmful capability.
+- Status: PENDING (general measurement); S4(b) on Aegis-Nano: FAIL.
 - Next: a fixed set of neutral prompts, N sampled generations per model,
   counted against a fixed word list, counts only; no harmful content is asked
   for. The result is a lower bound.

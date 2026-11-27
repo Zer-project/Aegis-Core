@@ -47,16 +47,17 @@ benchmark items built from the same sources; check before reporting scores.
 
 ## Compute
 
-Local machine: specifications PENDING (owner). Kaggle free GPU is a
-candidate for Track A and short Track B runs. Its quota and session limits are
-NOT VERIFIED: Kaggle documentation pages could not be read by the tooling on
-2026-11-25; a community post titled "floating GPU quota" mentions a 30-hour
-baseline (REPORTED, truncated, undated). The owner can read the current
-numbers in the Kaggle account page. Inference memory for 7-8B fp16 is about
-14-16 GB (INFERRED), which is tight on one T4 (no native bf16); to be measured
-in Phase 1.
+Local machine: WSL shows 3.8 GiB RAM and no GPU (VERIFIED, owner's output,
+2026-11-25); the Windows host specifications are still PENDING. This is enough
+for Aegis-Nano, not for 7-8B models. Kaggle free GPU is the candidate for Track B.
+Owner's account page (screenshot 2026-11-26) shows "GPU 30h available of 30h";
+the period (probably weekly) and session limits are NOT shown and not verified.
+Kaggle documentation pages could not be read by the tooling. Inference memory for
+7-8B fp16 is about 14-16 GB (INFERRED), tight on one T4 (no native bf16); to be
+measured in Phase 1.
 
 ## Training rule
 
 No training run for Track B before the Phase 1 gate. Track A SFT code exists
-as a separate, not yet merged patch (tests not yet run by the owner).
+on branch `fase0-sft` (not merged to main; unit tests pass, 201 on the owner's
+machine; one real run recorded in docs/EXPERIMENTS.md).
