@@ -59,5 +59,7 @@ measured in Phase 1.
 ## Training rule
 
 No training run for Track B before the Phase 1 gate. Track A SFT code exists
-on branch `fase0-sft` (not merged to main; unit tests pass, 201 on the owner's
-machine; one real run recorded in docs/EXPERIMENTS.md).
+on branch `fase0-sft` (not merged to main; 215 tests pass on the owner's machine).
+Runs recorded in docs/EXPERIMENTS.md: SFT with response-only loss, a fixed behavioural
+suite, and a refusal/over-refusal experiment. These validate the method on a 33.7M model;
+they do not show capability and say nothing about 7-8B models.

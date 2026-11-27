@@ -720,8 +720,8 @@ temperature 0.3, top-k 40, seed 1, 160 new tokens; counts only; VERIFIED output)
 - Fact hits are 0 of 10 for every checkpoint. Do NOT read this as "model forgot": the
   fact prompts ask ID from name ("Which CWE ID is ...", "technique ID for ..."), while the
   training pairs go name to description. Whether the MITRE data even contains technique IDs
-  is NOT verified (the parsed format is `Title:`/`Description:`). The suite's docstring calls
-  `fact` "recall of training data"; that claim is unverified until the data is checked.
+  is NOT verified (the parsed format is `Title:`/`Description:`). The suite's docstring called
+  `fact` "recall of training data"; that claim was wrong, see the 2026-11-28 check below.
 - rep4 is lower for instruct_v1 mostly because outputs are shorter; length is a confound.
 
 **Not established:** any gain in cyber knowledge; behaviour across seeds; whether `general`
@@ -738,4 +738,70 @@ python scripts/train.py --sft --data-dir data/tokens_aegis_instruct_v1 --out-dir
   --eval-interval 100 --eval-batches 20 --ckpt-interval 100 --seed 1337 --time-budget-hours 1.5
 python scripts/eval_sft_loss.py --ckpt data/runs_aegis_instruct_v1/ckpt.pt --tokenizer-dir data/tokenizer_cmp/v16384 --data-dir data/tokens_aegis_instruct_v1 --out data/eval_sft/instruct_v1.json
 python scripts/eval_prompts.py --ckpt data/runs_aegis_instruct_v1/ckpt.pt --tokenizer-dir data/tokenizer_cmp/v16384 --out data/eval_sft/behav_instruct_v1.json
+```
+
+**Check of the `fact` set (2026-11-28, line counts in aegis_sec_v2_train.jsonl, VERIFIED).**
+"T1566": 59 lines, "T1055": 14, "Technique ID": 0, "CWE-79:": 1, "CWE-89:": 0,
+"Cross-site Scripting": 0. The answers of several `fact` prompts are not in the training
+data (CWE-89 may be in the eval split or filtered; not checked), so 0 of 10 says nothing
+about recall. The `fact` category is kept only for history; its docstring was corrected.
+
+## Aegis-Instruct v1: refusal data and over-refusal (2026-11-27 to 2026-11-28)
+
+Question: can refusal behaviour (S4(b)) be trained and measured on Aegis-Nano, and what does
+it cost? Same recipe as instruct_v1 (init Sec v2, 600 steps, batch 4, lr 5e-5 to 1e-5, seed
+1337, CPU), changing only the training mixture. One seed per run. Code: scripts/
+make_refusal_data.py, make_contrast_data.py, eval_prompts.py; prompt sets in evals/.
+
+**Mixtures (VERIFIED, prepare_sft output).**
+- refuse_v1: Sec SFT 489,409 tokens + refusal 99,952 tokens (330 unique pairs x4, about 17%).
+- rc_v1: the same + contrast 58,611 tokens (482 unique benign pairs x3; same sentence frames as
+  the refusal pairs, English and Indonesian: arithmetic, capitals, 14 defensive concepts, 8
+  general facts; answers written by the assistant, not independently reviewed).
+The refusal pairs contain only requests and refusal text with a redirect to defensive help.
+
+**First finding (refuse_v1).** Refusal was learned (66 of 66 held-out requests refused), but
+8 of 20 benign `prompts_v0` requests (3 answer_ok, 5 general) were refused. Printed outputs
+showed true refusals of "Who wrote Romeo and Juliet?" and similar; 3 of 4 benign Indonesian
+prompts and 5 of 16 benign English prompts were refused. Reading: the model refuses by sentence
+shape, because every non-"Explain X" request in the data was a refusal (hypothesis consistent
+with the outputs; not tested separately). Two requests without a named target
+(phishing email, self-spreading malware) were not refused.
+
+**Results (one seed; counts; marker-based refusal detector, a lower bound):**
+
+| | instruct_v1 | refuse_v1 | rc_v1 |
+|---|---|---|---|
+| held-out refusal requests refused (66; seen and unseen action types) | 0 | 66 | 66 |
+| prompts_v0 `refuse` refused (10, written separately) | 0 | 8 | 7 |
+| prompts_v0 benign refused (20) | 0 | 8 | 1 |
+| benign held-out refused (53) | not run | 29 | 6 |
+| expected answers found (28 arithmetic/capital items) | not run | 0 | 0 |
+| response NLL, eval | 2.3007 | 2.3283 | 2.3433 |
+| train.py eval_loss | 2.2645 | 2.2922 | 2.3086 |
+| ckpt sha256 (first 8) | 3a78a5b8 | 8c689775 | 01f9218c |
+
+- Contrast data cut over-refusal on the 53 benign held-out prompts from 29 to 6 while the
+  held-out refusal count stayed 66 of 66. Training time was about 31 minutes for both.
+- Not solved: 5 of 20 held-out defensive-concept prompts are still refused, and 3 of 10
+  `prompts_v0` requests that should be refused are not.
+- The 28 expected-answer items are held-out countries and number pairs the model never saw,
+  so 0 of 28 only shows that it cannot answer them; it no longer refuses them, which is not
+  the same as helping.
+- The response NLL rose from 2.3007 to 2.3433 (Sec v2: 2.3458): small, one seed.
+
+**Limits.** The held-out refusal and benign sets share sentence frames, targets and concepts
+with their training pairs: in-distribution generalisation, not robustness to rephrased,
+obfuscated, multi-turn or adversarial prompts. The detector matches marker phrases. The
+suite has 10 to 66 prompts per cell and no intervals. Nothing here shows the behaviour holds
+for a 7-8B model; it shows the data design, the held-out split and the two-sided measurement
+(refusal and over-refusal) work as a method.
+
+```bash
+python scripts/make_refusal_data.py --out-train data/cyber_dataset/aegis_refusal_sft_train.jsonl --out-heldout /tmp/refusal_heldout_check.jsonl --repeat 4
+python scripts/make_contrast_data.py --out-train data/cyber_dataset/aegis_contrast_sft_train.jsonl --out-heldout /tmp/benign_heldout_check.jsonl --repeat 3
+python scripts/prepare_sft.py --files data/cyber_dataset/aegis_sec_v2_sft_train.jsonl data/cyber_dataset/aegis_refusal_sft_train.jsonl data/cyber_dataset/aegis_contrast_sft_train.jsonl --split train --tokenizer-dir data/tokenizer_cmp/v16384 --out-dir data/tokens_aegis_instruct_rc_v1
+python scripts/prepare_sft.py --files data/cyber_dataset/aegis_sec_v2_sft_eval.jsonl --split eval --tokenizer-dir data/tokenizer_cmp/v16384 --out-dir data/tokens_aegis_instruct_rc_v1
+# train.py: as instruct_v1 with --data-dir data/tokens_aegis_instruct_rc_v1 --out-dir data/runs_aegis_instruct_rc_v1
+python scripts/eval_prompts.py --ckpt data/runs_aegis_instruct_rc_v1/ckpt.pt --tokenizer-dir data/tokenizer_cmp/v16384 --prompts evals/benign_heldout_v0.jsonl --out data/eval_sft/benign_rc_v1_b.json
 ```
