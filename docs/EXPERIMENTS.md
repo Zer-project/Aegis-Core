@@ -867,7 +867,7 @@ Reproduce: docs/KAGGLE_RUNBOOK.md.
 ## Base-model bake-off, step 2: English multiple-choice cyber benchmarks (2026-11-28, Kaggle T4 x2)
 
 Question: do the two candidates differ in cyber knowledge on standard multiple-choice tests?
-Method (scripts/eval_hf_mcq.py v0.1.0, repo commit d565a2a): 4-shot prompt (one example per answer
+Method (scripts/eval_hf_mcq.py v0.1.0, repo commit ca0f14e [pra-rewrite: d565a2a]): 4-shot prompt (one example per answer
 letter, chosen by sha256 order, excluded from the test set); the prediction is the highest logit
 among " A".." D" after `Answer:`; fp16, `device_map=auto`, no `trust_remote_code`. Same prompt and
 the same questions for both models (both result files report identical input sha256 prefixes and
@@ -928,7 +928,7 @@ marked `ok` after a source check (UU No. 27 Tahun 2022 title read on the JDIH Ko
 name from Wikipedia and news articles; the official BSSN site was not read). All statuses are in the
 files (`reviewed_by`). Item 021 option C was reworded before review (it described a one-time pad).
 
-Method: scripts/eval_hf_mcq.py (repo commit 8baeba3, printed by `git log` in the notebook),
+Method: scripts/eval_hf_mcq.py (repo commit 6a03d4c [pra-rewrite: 8baeba3], printed by `git log` in the notebook),
 4-shot (examples chosen by item id, so identical in both languages and excluded from the test),
 `--only-reviewed --save-preds`, letter-logit scoring, fp16, models loaded with `--revision` set to
 the shas in the step 1 table.
