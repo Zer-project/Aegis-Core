@@ -26,3 +26,8 @@ pra-rewrite pada artefak run tetap sah sebagai catatan historis.
 ## Pencegahan
 Hook commit-msg lokal menolak pesan commit ber-trailer Co-authored-by
 yang menyebut claude / noreply@anthropic.com.
+
+## Catatan cache sidebar
+Sidebar GitHub sempat menampilkan kontributor lama (claude) pasca-rewrite,
+meskipun /contributors dan /stats/contributors terverifikasi bersih
+(HTTP 200, satu login Zer-project) per 2026-11-29.
