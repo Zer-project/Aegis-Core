@@ -913,3 +913,54 @@ version differs from step 1 (5.24.1) because the Kaggle session was restarted; b
 2 ran in the same session.
 
 Reproduce: docs/KAGGLE_RUNBOOK.md, step 2.
+
+## Base-model bake-off, step 3: parallel Indonesian/English multiple choice (2026-11-28, Kaggle T4 x2)
+
+Question: do the candidates differ in basic cyber knowledge when the same facts are asked in
+Indonesian and in English? Set: evals/mcq_id_v0.jsonl and evals/mcq_en_parallel_v0.jsonl, 60 items
+in 6 topics (basics, networking, cryptography, web, attacks, operations), written by the assistant
+for this project (no benchmark text copied), same option order and answer letter in both languages.
+Option length was balanced (the correct option is longest or tied for longest in 16 of 60
+Indonesian and 10 of 60 English items, strictly longest in 5 and 3; before balancing it was
+strictly longest in 41 and 29) and gold letters are 15 each; tests/test_mcq_sets.py enforces both. Review:
+the owner read all 60 items and marked 58 `ok`; items 59 and 60 (Indonesian local facts) were
+marked `ok` after a source check (UU No. 27 Tahun 2022 title read on the JDIH Komdigi page; the BSSN
+name from Wikipedia and news articles; the official BSSN site was not read). All statuses are in the
+files (`reviewed_by`). Item 021 option C was reworded before review (it described a one-time pad).
+
+Method: scripts/eval_hf_mcq.py (repo commit 8baeba3, printed by `git log` in the notebook),
+4-shot (examples chosen by item id, so identical in both languages and excluded from the test),
+`--only-reviewed --save-preds`, letter-logit scoring, fp16, models loaded with `--revision` set to
+the shas in the step 1 table.
+
+**Numbers printed by the owner from the notebook (VERIFIED; one run per model, n = 56 per language):**
+
+| accuracy (95% Wilson interval) | Indonesian | English |
+|---|---|---|
+| Olmo-3-1025-7B | 98.2% (55/56; 90.6-99.7) | 100% (56/56; 93.6-100) |
+| Qwen3-8B-Base | 100% (56/56; 93.6-100) | 100% (56/56; 93.6-100) |
+
+Majority-letter baseline 25%; predicted-letter counts 14/14/14/14 except Olmo Indonesian
+14/15/14/13. Time 40.1 s (Olmo 3) and 47.7 s (Qwen3), peak memory 7.04 and 7.84 GB per GPU.
+
+**Reading.** The set does not separate the models: both are at ceiling, and the one Olmo 3 miss
+(item sec-023, Indonesian version only; its English twin was answered correctly) is not
+distinguishable from chance variation at n = 56. The key of sec-023 ("one-way: easy to compute,
+impractical to invert") is correct and its distractors are clearly wrong, so this is a model miss
+and not a defective item (INFERRED from reading the item). Likely reasons
+(HYPOTHESES, not measured): the items are textbook concepts with clearly wrong distractors, and
+questions written by a language model tend to be easy for language models. Consequences:
+- The 28% bits-per-byte gap in Indonesian (step 1) is not matched by a gap in basic Indonesian
+  cyber knowledge. It reflects text-prediction fluency. The step 1 reading that Olmo 3 is "weak in
+  Indonesian" is therefore narrowed to likelihood/fluency; it is not a knowledge claim.
+- What D1 needs most, Indonesian generation quality, is not measured by multiple choice.
+- The set is still useful as a regression guard for later fine-tuned models (a drop on this easy
+  set would signal damaged basic knowledge). A pass threshold is not yet defined.
+
+**Run metadata (from the result JSON, VERIFIED, printed by the owner).** `commit_hash_source` is
+`pinned_arg` for both models; the commit hash prefixes are a81bae42db39 (Olmo-3-1025-7B) and
+49e3418fbbbc (Qwen3-8B-Base), matching the pins in the step 1 table. transformers 5.20.2, fp16,
+script_version 0.3.0, `only_reviewed` true, n = 56 in every cell. The missed item was identified
+from the per-item predictions (`--save-preds`).
+
+Reproduce: docs/KAGGLE_RUNBOOK.md, step 3.
