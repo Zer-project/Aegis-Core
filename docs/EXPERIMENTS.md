@@ -816,8 +816,8 @@ Corpora (scripts/make_eval_bundle.py, manifest in data/kaggle_bundle_v1/): cyber
 (MITRE/CWE eval split of Aegis-Sec v2; 33 shorter than 200 characters dropped), en 200 and id
 200 documents from the project's independent eval sets (F1-filtered). Code commit 1247872.
 
-**Numbers transcribed from the owner's notebook screenshots (the JSON files were not
-inspected; one run per model; no intervals):**
+**Numbers transcribed from the owner's notebook screenshots (one run per model; no
+intervals; the metadata below was printed from the result JSON files by the owner):**
 
 | bits per byte (lower is better) | Olmo-3-1025-7B | Qwen3-8B-Base | Qwen3 lower by |
 |---|---|---|---|
@@ -844,5 +844,22 @@ that Olmo 3 is weak in Indonesian. Qwen3-8B-Base is better on all three corpora.
 - fp16 gave finite losses for both models.
 - Transparency is a project goal: Olmo 3 documents its data and training; Qwen3 does not.
   This trades against the Indonesian result. D3 stays PROPOSED.
+
+**Run metadata (from the result JSON, VERIFIED, printed by the owner).** dtype fp16, no BOS
+prefix for either tokenizer (`bos_prefix` false, so the first token of each window is not
+scored for both), transformers 5.24.1, torch 2.11.0+cu130, two Tesla T4 (15,360 MiB each).
+The runs used unpinned revisions and the JSON field `commit_hash` is null (transformers 5.x
+no longer exposes the attribute the script read; fixed in scripts/eval_hf_bpb.py 0.1.1). The
+Kaggle session was restarted afterwards, so the cache snapshot folder was gone. Revisions were
+recovered from the Hub on 2026-11-28 (the run was about 02:30 UTC that day):
+
+| model | revision (sha) | last commit on the Hub |
+|---|---|---|
+| allenai/Olmo-3-1025-7B | a81bae42db3975be1671e27b9c9a56da1a9f980f | 2026-04-21 17:21 UTC |
+| Qwen/Qwen3-8B-Base | 49e3418fbbbca6ecbdf9608b4d22e5a407081db4 | 2025-05-21 05:59 UTC |
+
+Both last commits predate the runs, so these are the revisions that were downloaded, assuming
+the repository history was not rewritten (INFERRED, not seen in the cache). Later runs should
+pass `--revision` with these values.
 
 Reproduce: docs/KAGGLE_RUNBOOK.md.
