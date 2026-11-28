@@ -944,7 +944,10 @@ Majority-letter baseline 25%; predicted-letter counts 14/14/14/14 except Olmo In
 14/15/14/13. Time 40.1 s (Olmo 3) and 47.7 s (Qwen3), peak memory 7.04 and 7.84 GB per GPU.
 
 **Reading.** The set does not separate the models: both are at ceiling, and the one Olmo 3 miss
-(a single Indonesian item) is not distinguishable from chance variation at n = 56. Likely reasons
+(item sec-023, Indonesian version only; its English twin was answered correctly) is not
+distinguishable from chance variation at n = 56. The key of sec-023 ("one-way: easy to compute,
+impractical to invert") is correct and its distractors are clearly wrong, so this is a model miss
+and not a defective item (INFERRED from reading the item). Likely reasons
 (HYPOTHESES, not measured): the items are textbook concepts with clearly wrong distractors, and
 questions written by a language model tend to be easy for language models. Consequences:
 - The 28% bits-per-byte gap in Indonesian (step 1) is not matched by a gap in basic Indonesian
@@ -954,8 +957,10 @@ questions written by a language model tend to be easy for language models. Conse
 - The set is still useful as a regression guard for later fine-tuned models (a drop on this easy
   set would signal damaged basic knowledge). A pass threshold is not yet defined.
 
-Not yet inspected (PENDING): `commit_hash_source`, the transformers version and the id of the
-missed Indonesian item (the result JSON was saved with `--save-preds`; the owner was asked to
-print these before shutting the session down).
+**Run metadata (from the result JSON, VERIFIED, printed by the owner).** `commit_hash_source` is
+`pinned_arg` for both models; the commit hash prefixes are a81bae42db39 (Olmo-3-1025-7B) and
+49e3418fbbbc (Qwen3-8B-Base), matching the pins in the step 1 table. transformers 5.20.2, fp16,
+script_version 0.3.0, `only_reviewed` true, n = 56 in every cell. The missed item was identified
+from the per-item predictions (`--save-preds`).
 
 Reproduce: docs/KAGGLE_RUNBOOK.md, step 3.
