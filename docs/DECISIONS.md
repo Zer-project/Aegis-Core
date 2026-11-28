@@ -22,9 +22,13 @@ Against it: its training data is not disclosed, while Olmo 3's is (project goal:
 Step 2 result (docs/EXPERIMENTS.md, English multiple-choice, 4-shot, one run each): CTI-MCQ is a
 tie (73.8% vs 73.6%, 500 questions); CyberMetric-500 favours Qwen3-8B-Base (93.3% vs 86.3%,
 non-overlapping 95% intervals). No measure so far favours Olmo 3 beyond noise.
-Remaining before acceptance: a project-written Indonesian set (Indonesian knowledge is still not
-tested directly), a reading of both licences by a qualified person (G2), and the owner's
-decision on the transparency trade-off.
+Step 3 result (project-written parallel Indonesian/English set, 56 test items, 4-shot): both models
+are at ceiling (Olmo 3: 98.2% Indonesian, 100% English; Qwen3: 100% and 100%), so the set does not
+separate them. Correction to the earlier reading: the 28% bits-per-byte gap in Indonesian reflects
+text-prediction fluency; it is not evidence that Olmo 3 lacks basic Indonesian cyber knowledge.
+Remaining before acceptance: a check of Indonesian generation quality (what D1 actually needs, and
+what multiple choice cannot measure), a reading of both licences by a qualified person (G2), and
+the owner's decision on the transparency trade-off.
 
 ## D4 Compute plan - PROPOSED
 Local hardware (PENDING: owner to state RAM/GPU/VRAM) plus Kaggle when
