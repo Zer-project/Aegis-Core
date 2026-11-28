@@ -13,12 +13,15 @@ S1 as written (defensive/analytical use and support for authorised testing). Wor
 exploits and malware stay out of scope, and outside what the assistant will help build.
 
 ## D3 Base model for Track B - PROPOSED
-Owner's stated preference (2026-11-25): Olmo 3 7B; Qwen3-8B-Base as comparison. The choice
-is made by the Phase 1 bake-off on the fixed eval suite, not by preference. Facts read on
-2026-11-28 from the Hugging Face cards (see ROADMAP): both Apache 2.0. Open question: D1
-needs Indonesian; Olmo 3 is trained on Dolma 3 (not described as multilingual on the card
-page read; INFERRED to be mostly English), Qwen3 states 119 languages. The bake-off must
-include Indonesian prompts before D3 is accepted.
+Owner's stated preference (2026-11-25): Olmo 3 7B; Qwen3-8B-Base as comparison. The choice is
+made by the Phase 1 bake-off, not by preference. Facts (Hugging Face cards, 2026-11-28): both
+Apache 2.0. Step 1 result (docs/EXPERIMENTS.md, one run each): Qwen3-8B-Base has lower bits per
+byte on all three corpora, by 28.4% on Indonesian, 6.1% on cyber text, 3.5% on English. Since D1
+requires Indonesian, the evidence so far favours Qwen3-8B-Base as the working base for Phase 3.
+Against it: its training data is not disclosed, while Olmo 3's is (project goal: transparency).
+Remaining before acceptance: step 2 (multiple-choice cyber benchmarks after a licence check, a
+project-written Indonesian set), a reading of both licences by a qualified person (G2), and the
+owner's decision on the transparency trade-off.
 
 ## D4 Compute plan - PROPOSED
 Local hardware (PENDING: owner to state RAM/GPU/VRAM) plus Kaggle when
