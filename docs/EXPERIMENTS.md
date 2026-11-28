@@ -805,3 +805,44 @@ python scripts/prepare_sft.py --files data/cyber_dataset/aegis_sec_v2_sft_eval.j
 # train.py: as instruct_v1 with --data-dir data/tokens_aegis_instruct_rc_v1 --out-dir data/runs_aegis_instruct_rc_v1
 python scripts/eval_prompts.py --ckpt data/runs_aegis_instruct_rc_v1/ckpt.pt --tokenizer-dir data/tokenizer_cmp/v16384 --prompts evals/benign_heldout_v0.jsonl --out data/eval_sft/benign_rc_v1_b.json
 ```
+
+## Base-model bake-off, step 1: bits per byte (2026-11-28, Kaggle T4 x2)
+
+Question: which candidate base model predicts domain text, general English and general
+Indonesian best (D1 needs Indonesian)? Metric: bits per byte (scripts/eval_hf_bpb.py v0.1.0;
+byte attribution is proportional, an approximation; windows of 1,024 tokens, documents cut to
+4,000 characters; fp16, `device_map=auto` over two GPUs, no `trust_remote_code`).
+Corpora (scripts/make_eval_bundle.py, manifest in data/kaggle_bundle_v1/): cyber 248 documents
+(MITRE/CWE eval split of Aegis-Sec v2; 33 shorter than 200 characters dropped), en 200 and id
+200 documents from the project's independent eval sets (F1-filtered). Code commit 1247872.
+
+**Numbers transcribed from the owner's notebook screenshots (the JSON files were not
+inspected; one run per model; no intervals):**
+
+| bits per byte (lower is better) | Olmo-3-1025-7B | Qwen3-8B-Base | Qwen3 lower by |
+|---|---|---|---|
+| cyber (MITRE/CWE eval) | 0.6438 | 0.6044 | 6.1% |
+| general English | 0.6911 | 0.6667 | 3.5% |
+| general Indonesian | 1.0532 | 0.7545 | 28.4% |
+| bits per token cyber / en / id | 3.054 / 3.321 / 3.584 | 2.745 / 3.148 / 2.544 | |
+| peak GPU memory (GB, two GPUs) | 7.57, 7.25 | 8.79, 8.09 | |
+| evaluation time (s, excluding download) | 270.7 | 359.0 | |
+
+Derived (arithmetic on the table): Indonesian minus English is 0.362 bit/byte for Olmo 3 and
+0.088 for Qwen3. Bytes per token on Indonesian are about 3.40 (Olmo 3) and 3.37 (Qwen3), so the
+gap is not a tokenizer-efficiency artefact: Olmo 3 predicts the Indonesian text worse. Kaggle
+quota counter: 00:55 of 30 h after both runs and the setup (VERIFIED, screenshot).
+
+**Reading.** This supports the earlier concern (INFERRED then, now measured on this sample)
+that Olmo 3 is weak in Indonesian. Qwen3-8B-Base is better on all three corpora. Caveats:
+- Bits per byte measures text prediction, not cyber knowledge, instruction following or safety.
+- Neither model's pretraining data can be excluded as containing these public texts (MITRE/CWE,
+  CommonCrawl-derived web text); lower bits per byte may partly reflect exposure. Qwen3's data is
+  not disclosed; Olmo 3's is (Dolma 3). Not separable here.
+- 200 documents per corpus, one run, no confidence interval; the cyber and English gaps (6.1%,
+  3.5%) are small enough that they need an interval before being called real.
+- fp16 gave finite losses for both models.
+- Transparency is a project goal: Olmo 3 documents its data and training; Qwen3 does not.
+  This trades against the Indonesian result. D3 stays PROPOSED.
+
+Reproduce: docs/KAGGLE_RUNBOOK.md.
