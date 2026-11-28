@@ -29,13 +29,13 @@ One cell per model (each run is a separate process, so memory is freed in betwee
 
 ```python
 D = "/kaggle/input/<dataset-slug>"
-!python Aegis-Core/scripts/eval_hf_bpb.py --model-id allenai/Olmo-3-1025-7B \
+!python Aegis-Core/scripts/eval_hf_bpb.py --model-id allenai/Olmo-3-1025-7B --revision a81bae42db3975be1671e27b9c9a56da1a9f980f \
   --corpus cyber={D}/cyber_eval.jsonl --corpus en={D}/en_eval.jsonl --corpus id={D}/id_eval.jsonl \
   --out /kaggle/working/bpb_olmo3_7b.json
 ```
 
 ```python
-!python Aegis-Core/scripts/eval_hf_bpb.py --model-id Qwen/Qwen3-8B-Base \
+!python Aegis-Core/scripts/eval_hf_bpb.py --model-id Qwen/Qwen3-8B-Base --revision 49e3418fbbbca6ecbdf9608b4d22e5a407081db4 \
   --corpus cyber={D}/cyber_eval.jsonl --corpus en={D}/en_eval.jsonl --corpus id={D}/id_eval.jsonl \
   --out /kaggle/working/bpb_qwen3_8b.json
 ```
@@ -43,6 +43,9 @@ D = "/kaggle/input/<dataset-slug>"
 If a run fails with a non-finite loss (fp16 overflow), retry once with `--dtype bf16`
 (T4 has no native bf16; it may be slow or fail) or `--load-4bit`, and record which was used:
 results from different precisions are not directly comparable.
+
+Revisions above are the ones used on 2026-11-28 (see docs/EXPERIMENTS.md). The result JSON
+records the resolved revision from scripts/eval_hf_bpb.py 0.1.1 onward.
 
 Paste the printed summary (bits per byte and per token per corpus, time, peak memory) and the
 `commit_hash` field of each JSON into the chat. Lower bits per byte is better.
