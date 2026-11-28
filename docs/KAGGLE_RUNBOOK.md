@@ -131,5 +131,10 @@ SEC_ID = "Aegis-Core/evals/mcq_id_v0.jsonl"; SEC_EN = "Aegis-Core/evals/mcq_en_p
   --bench sec_id={SEC_ID} --bench sec_en={SEC_EN} --shots 4 --save-preds --out /kaggle/working/mcq_sec_qwen3_8b.json
 ```
 
+Mark review status with `scripts/mark_mcq_review.py` (updates both files together; records who
+reviewed; never changes question text), for example
+`python scripts/mark_mcq_review.py --reviewer NAME --ok-all --reject sec-0xx` (use `--dry-run`
+first). `--ok-all` only touches items still `unreviewed`.
+
 Add `--only-reviewed` once items are marked `ok`. The JSON then records `only_reviewed` and
 `items_in_file_not_rejected`. `commit_hash_source` should read `pinned_arg`.

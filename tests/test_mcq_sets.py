@@ -81,3 +81,8 @@ def test_pemilihan_contoh_dan_uji_sama_di_kedua_bahasa_dengan_by_id():
     # dengan by='question' urutan bergantung pada teks, jadi tidak dijamin sama
     sa2, _ = em.split_items(a, 4, 0)
     assert len(sa2) == 4
+
+
+def test_status_tinjauan_sama_di_kedua_bahasa():
+    a, b = rows(ID_SET), rows(EN_SET)
+    assert [x["review"] for x in a] == [x["review"] for x in b]
