@@ -13,8 +13,15 @@ import mark_mcq_review as mm  # noqa: E402
 
 @pytest.fixture
 def d(tmp_path):
+    """Salinan set asli dengan status DIRESET ke unreviewed: tes tidak boleh bergantung pada
+    status tinjauan yang sebenarnya (yang berubah ketika pemilik menandai soal)."""
     for n in mm.FILES:
         shutil.copy(ROOT / "evals" / n, tmp_path / n)
+        recs = mm.load(tmp_path / n)
+        for r in recs:
+            r["review"] = "unreviewed"
+            r.pop("reviewed_by", None)
+        mm.save(tmp_path / n, recs)
     return tmp_path
 
 
