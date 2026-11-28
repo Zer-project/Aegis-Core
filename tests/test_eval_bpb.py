@@ -81,3 +81,13 @@ def test_bundle_menolak_kunci_hilang_dan_melewati_dokumen_pendek(tmp_path):
     w(p, ["a"], key="konten")
     with pytest.raises(ValueError, match="konten"):
         mb.read_texts(p)
+
+
+def test_dtype_kwarg_menurut_versi_transformers():
+    assert eb.dtype_kwarg("4.57.1") == "torch_dtype"
+    assert eb.dtype_kwarg("5.24.1") == "dtype"
+    assert eb.dtype_kwarg("5.0.0.dev0") == "dtype"
+
+
+def test_resolved_revision_tidak_menggagalkan_tanpa_cache():
+    assert eb.resolved_revision("tidak/ada-model-ini", None) is None

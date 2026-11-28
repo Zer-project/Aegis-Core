@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 def load_docs(path, max_docs, max_chars, key="text"):
@@ -40,6 +40,20 @@ def make_windows(ids, size):
     if size < 2:
         raise ValueError("window harus >= 2")
     return [c for c in (ids[i:i + size] for i in range(0, len(ids), size)) if len(c) >= 2]
+
+
+def dtype_kwarg(transformers_version):
+    """transformers 5.x menamai torch_dtype menjadi dtype; 4.x hanya mengenal torch_dtype."""
+    return "dtype" if int(str(transformers_version).split(".")[0]) >= 5 else "torch_dtype"
+
+
+def resolved_revision(model_id, revision):
+    """sha komit snapshot yang dipakai (nama folder snapshot di cache lokal); None bila tak ada."""
+    try:
+        from huggingface_hub import snapshot_download
+        return Path(snapshot_download(model_id, revision=revision, local_files_only=True)).name
+    except Exception:  # noqa: BLE001 - metadata saja; jangan menggagalkan evaluasi
+        return None
 
 
 def bits_per_byte(nll_nats, n_pred, n_tokens, n_bytes):
@@ -75,7 +89,8 @@ def run(a):
         kw["quantization_config"] = transformers.BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16)
     else:
-        kw["torch_dtype"] = {"fp16": torch.float16, "bf16": torch.bfloat16, "fp32": torch.float32}[a.dtype]
+        kw[dtype_kwarg(transformers.__version__)] = {
+            "fp16": torch.float16, "bf16": torch.bfloat16, "fp32": torch.float32}[a.dtype]
     tok = AutoTokenizer.from_pretrained(a.model_id, revision=a.revision, trust_remote_code=False)
     model = AutoModelForCausalLM.from_pretrained(a.model_id, revision=a.revision,
                                                  trust_remote_code=False, **kw)
@@ -103,7 +118,7 @@ def run(a):
         res[name] = score_corpus(nll_fn, tokenize, load_docs(path, a.max_docs, a.max_chars),
                                  a.window, bos is not None)
     out = {"script_version": __version__, "model_id": a.model_id, "revision_arg": a.revision,
-           "commit_hash": getattr(model.config, "_commit_hash", None),
+           "commit_hash": resolved_revision(a.model_id, a.revision),
            "dtype": "4bit" if a.load_4bit else a.dtype, "window": a.window, "max_chars": a.max_chars,
            "max_docs": a.max_docs, "bos_prefix": bos is not None, "seconds": round(time.time() - t0, 1),
            "torch": torch.__version__, "transformers": transformers.__version__,
